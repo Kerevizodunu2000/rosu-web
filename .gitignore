@@ -42,3 +42,8 @@ Thumbs.db
 
 # Superpowers SDD scratch (ledger, briefs, diffs)
 .superpowers/
+
+# Local artifacts (playwright output, dev screenshots, source app images)
+.playwright-mcp/
+report-live.png
+/app-img/
