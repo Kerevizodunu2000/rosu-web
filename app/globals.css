@@ -72,6 +72,15 @@ body {
   border-radius: 4px;
 }
 
+/* The screenshot picker's real <input type="file"> is visually hidden (sr-only)
+   behind a styled label; this keeps a visible focus ring on the label when the
+   underlying input has keyboard focus, so hiding it never costs accessibility. */
+.file-trigger:has(:focus-visible) {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -153,6 +162,66 @@ body {
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+  }
+
+  /* Form controls (report form, admin login) — recessed relative to the .card
+     surface they sit in, so the surface stays the "container" tier and the
+     control reads as the tier you type into (var(--bg) is darker than
+     --surface in light mode and lighter... i.e. always the recessed one). */
+  .field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .field-input,
+  .field-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.9375rem;
+    color: var(--text);
+    transition:
+      border-color 150ms ease-out,
+      background-color 150ms ease-out;
+  }
+
+  .field-input::placeholder,
+  .field-textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  .field-input:hover,
+  .field-textarea:hover {
+    border-color: color-mix(in srgb, var(--accent-2) 35%, var(--border));
+  }
+
+  .field-input:focus-visible,
+  .field-textarea:focus-visible {
+    border-color: var(--accent-2);
+    background: var(--surface);
+  }
+
+  .field-textarea {
+    min-height: 140px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  .field-hint {
+    margin-top: 0.4rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .field-error {
+    margin-top: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--accent-rose);
   }
 }
 
