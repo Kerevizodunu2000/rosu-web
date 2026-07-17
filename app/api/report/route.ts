@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/ratelimit'
 import { getSql, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince } from '@/lib/db'
 import { DriveClient } from '@/lib/drive'
 import { clientIp } from '@/lib/net'
+import { requireEnv } from '@/lib/env'
 
 export const runtime = 'nodejs'
 
@@ -13,8 +14,8 @@ let _drive: DriveClient | null = null
 function getDrive(): DriveClient {
   if (!_drive) {
     _drive = new DriveClient({
-      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID!, clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
-      refreshToken: process.env.GOOGLE_REFRESH_TOKEN!,
+      clientId: requireEnv('GOOGLE_OAUTH_CLIENT_ID'), clientSecret: requireEnv('GOOGLE_OAUTH_CLIENT_SECRET'),
+      refreshToken: requireEnv('GOOGLE_REFRESH_TOKEN'),
     })
   }
   return _drive
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     const result = await handleReport({
       raw, ip: clientIp(req), userAgent: req.headers.get('user-agent') || '',
       deps: {
-        salt: process.env.IP_HASH_SALT!, appToken: process.env.REPORT_APP_TOKEN || '', turnstileSecret: process.env.TURNSTILE_SECRET_KEY!,
+        salt: requireEnv('IP_HASH_SALT'), appToken: process.env.REPORT_APP_TOKEN || '', turnstileSecret: requireEnv('TURNSTILE_SECRET_KEY'),
         verifyTurnstile,
         checkRateLimit: (ipHash) => checkRateLimit(ipHash, {
           countEventsSince: (ip, since) => countEventsSince(sql, ip, since),

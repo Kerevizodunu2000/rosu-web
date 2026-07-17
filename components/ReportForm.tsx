@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 "use client";
 
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { LIMITS, ALLOWED_MIME } from "@/lib/validation";
@@ -99,6 +99,15 @@ export default function ReportForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const successRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Move focus to the outcome after submitting, so keyboard/screen-reader users
+  // land on the confirmation or the error banner instead of being dropped onto <body>.
+  useEffect(() => {
+    if (status === "success") successRef.current?.focus();
+    else if (status === "error") errorRef.current?.focus();
+  }, [status]);
 
   function renderTurnstile() {
     if (!SITE_KEY || !turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
@@ -146,6 +155,15 @@ export default function ReportForm() {
     description.trim().length > 0 &&
     status !== "sending" &&
     (!SITE_KEY || turnstileToken.length > 0);
+
+  // Show a hint only once the form is otherwise complete but the captcha is
+  // unsolved, so a user staring at a disabled button knows what's left to do.
+  const showSubmitHint =
+    Boolean(SITE_KEY) &&
+    turnstileToken.length === 0 &&
+    title.trim().length > 0 &&
+    description.trim().length > 0 &&
+    status !== "sending";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -205,21 +223,28 @@ export default function ReportForm() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent/12 text-accent-2">
           <IconCheck />
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-fg">Thanks — your report reached us.</h2>
+        <h2 ref={successRef} tabIndex={-1} className="mt-4 text-xl font-semibold text-fg outline-none">
+          Thanks — your report reached us.
+        </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-fg-muted">
           {contact.trim()
             ? "We'll reply to the email you left if we need more details or have an update."
             : "Leave a contact email next time if you'd like a reply from us."}
         </p>
-        <Link href="/" className="btn btn-secondary mt-6">
-          Back to home
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <a href="/report" className="btn btn-primary">
+            Send another report
+          </a>
+          <Link href="/" className="btn btn-secondary">
+            Back to home
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <form onSubmit={handleSubmit} aria-busy={status === "sending"} className="flex flex-col gap-6">
       {/* Honeypot — hidden from sighted and AT users alike; a filled-in value marks the submission as spam server-side. */}
       <div className="sr-only" aria-hidden="true">
         <label htmlFor="hp">Leave this field empty</label>
@@ -348,27 +373,25 @@ export default function ReportForm() {
             placeholder="you@example.com"
             className="field-input mt-1.5"
           />
-          <p className="field-hint">So we can reply if we have a question or a fix. Never shared.</p>
+          <p className="field-hint">So we can reply if we have a question or a fix. Never shared publicly or sold.</p>
         </div>
 
-        <div>
-          {SITE_KEY ? (
-            <>
-              <Script
-                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-                strategy="afterInteractive"
-                onReady={renderTurnstile}
-              />
-              <div ref={turnstileRef} />
-            </>
-          ) : (
-            <p className="text-xs text-fg-muted">Captcha will appear once configured.</p>
-          )}
-        </div>
+        {SITE_KEY && (
+          <div>
+            <span className="field-label">Verify you&apos;re human</span>
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+              onReady={renderTurnstile}
+            />
+            {/* Reserve height so the async widget load doesn't shove the submit button down. */}
+            <div ref={turnstileRef} className="mt-1.5 min-h-[65px]" />
+          </div>
+        )}
       </fieldset>
 
       {status === "error" && errorMessage && (
-        <div role="alert" className="rounded-xl border border-accent-rose/25 bg-accent-rose/[0.06] p-4 text-sm">
+        <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-xl border border-accent-rose/25 bg-accent-rose/[0.06] p-4 text-sm outline-none">
           <p className="font-medium text-accent-rose">{errorMessage}</p>
           <p className="mt-1 text-fg-muted">
             You can also reach us directly at{" "}
@@ -380,13 +403,21 @@ export default function ReportForm() {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-      >
-        {status === "sending" ? "Sending…" : "Send report"}
-      </button>
+      <div>
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          aria-describedby={showSubmitHint ? "submit-hint" : undefined}
+          className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          {status === "sending" ? "Sending…" : "Send report"}
+        </button>
+        {showSubmitHint && (
+          <p id="submit-hint" className="field-hint">
+            Complete the check above to enable sending.
+          </p>
+        )}
+      </div>
     </form>
   );
 }

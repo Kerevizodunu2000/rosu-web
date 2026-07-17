@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import type { Metadata } from "next";
+import Link from "next/link";
 import ReportForm from "@/components/ReportForm";
 import Disclosure from "@/components/Disclosure";
+import { PRIVACY_PATH } from "@/lib/links";
 
 export const metadata: Metadata = {
   title: "Report a problem — Rosu",
@@ -27,6 +29,14 @@ export default function ReportPage() {
       </div>
 
       <Disclosure className="mt-6" />
+
+      <p className="mt-4 text-sm text-fg-muted">
+        For the full details, read our{" "}
+        <Link href={PRIVACY_PATH} className="text-accent-2 underline underline-offset-2">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </section>
   );
 }

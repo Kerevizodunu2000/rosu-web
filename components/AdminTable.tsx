@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportRecord } from "@/lib/db";
+import Lightbox from "@/components/Lightbox";
 
 type ArchiveResponse = { ok?: boolean; archived?: number; archiveName?: string };
 
@@ -11,14 +12,6 @@ function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
-function IconX() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-      <path d="M5 5l14 14M19 5 5 19" />
-    </svg>
-  );
 }
 
 // The one signature touch: a small source dot (reused inside the existing
@@ -64,7 +57,7 @@ function ImageCell({
   onOpen,
 }: {
   report: ReportRecord;
-  onOpen: (e: MouseEvent<HTMLButtonElement>) => void;
+  onOpen: () => void;
 }) {
   if (report.image_status === "stored") {
     return (
@@ -101,32 +94,12 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [lightboxId, setLightboxId] = useState<number | null>(null);
 
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const lightboxTriggerRef = useRef<HTMLElement | null>(null);
-
   // Transient toast-like message after an archive run — clears itself.
   useEffect(() => {
     if (!archiveMessage) return;
     const t = setTimeout(() => setArchiveMessage(null), 6000);
     return () => clearTimeout(t);
   }, [archiveMessage]);
-
-  // Lightbox behavior contract: Escape closes, background scroll locks,
-  // focus moves to the close button and returns to the trigger on close.
-  useEffect(() => {
-    if (lightboxId === null) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeLightbox();
-    }
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [lightboxId]);
 
   function toggleExpanded(id: number) {
     setExpanded((prev) => {
@@ -135,16 +108,6 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
       else next.add(id);
       return next;
     });
-  }
-
-  function openLightbox(id: number, e: MouseEvent<HTMLButtonElement>) {
-    lightboxTriggerRef.current = e.currentTarget;
-    setLightboxId(id);
-  }
-
-  function closeLightbox() {
-    setLightboxId(null);
-    lightboxTriggerRef.current?.focus();
   }
 
   async function handleArchive() {
@@ -206,6 +169,7 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
             type="button"
             onClick={handleArchive}
             disabled={busyArchive}
+            aria-busy={busyArchive}
             className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busyArchive ? "Archiving…" : "Archive now"}
@@ -271,7 +235,7 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
                       <div>{r.lang || "—"}</div>
                     </td>
                     <td className="py-3 pl-3 pr-4">
-                      <ImageCell report={r} onOpen={(e) => openLightbox(r.id, e)} />
+                      <ImageCell report={r} onOpen={() => setLightboxId(r.id)} />
                     </td>
                   </tr>
                 );
@@ -282,31 +246,11 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
       )}
 
       {lightboxId !== null && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Report screenshot"
-          onClick={closeLightbox}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-        >
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- proxied admin-only image, not a static asset Next can optimize */}
-            <img
-              src={`/api/admin/image/${lightboxId}`}
-              alt="report screenshot"
-              className="max-h-[85vh] max-w-[90vw] rounded-xl border border-white/10 object-contain"
-            />
-            <button
-              ref={closeButtonRef}
-              type="button"
-              onClick={closeLightbox}
-              aria-label="Close"
-              className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface text-fg shadow-card"
-            >
-              <IconX />
-            </button>
-          </div>
-        </div>
+        <Lightbox
+          src={`/api/admin/image/${lightboxId}`}
+          alt="Report screenshot"
+          onClose={() => setLightboxId(null)}
+        />
       )}
     </div>
   );

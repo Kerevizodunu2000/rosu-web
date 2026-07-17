@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import Link from "next/link";
 import Brand from "./Brand";
-import { CONTACT_EMAIL, DOWNLOAD_URL, GITHUB_URL } from "@/lib/links";
+import { CONTACT_EMAIL, DOWNLOAD_URL, GITHUB_URL, PRIVACY_PATH, TERMS_PATH } from "@/lib/links";
 
 function GithubIcon() {
   return (
@@ -25,6 +26,18 @@ export default function Footer() {
 
           <div className="flex flex-col items-start gap-4 sm:items-end">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-fg-muted">
+              <Link
+                href={PRIVACY_PATH}
+                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
+              >
+                Privacy
+              </Link>
+              <Link
+                href={TERMS_PATH}
+                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
+              >
+                Terms
+              </Link>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
                 className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
@@ -47,7 +60,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <p className="mt-10 font-mono text-xs uppercase tracking-wide text-fg-muted/80">
+        <p className="mt-10 font-mono text-xs uppercase tracking-wide text-fg-muted">
           © {new Date().getFullYear()} Rosu · GPL-3.0-or-later
         </p>
       </div>

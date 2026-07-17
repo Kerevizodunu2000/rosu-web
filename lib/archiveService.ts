@@ -16,8 +16,15 @@ export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ ar
   for (const r of reports) {
     let image: { name: string; bytes: Uint8Array } | undefined
     if (r.image_status === 'stored' && r.image_drive_id && r.image_name) {
-      image = { name: r.image_name, bytes: await deps.downloadImage(r.image_drive_id) }
-      toDelete.push(r.image_drive_id)
+      try {
+        image = { name: r.image_name, bytes: await deps.downloadImage(r.image_drive_id) }
+        toDelete.push(r.image_drive_id)
+      } catch {
+        // A single unreadable image (deleted in Drive, or a transient error) must
+        // not wedge the whole nightly archive forever — archive the report's text
+        // without it and move on.
+        image = undefined
+      }
     }
     entries.push({ report: r as unknown as { id: number }, image })
   }

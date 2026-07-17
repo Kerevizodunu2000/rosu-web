@@ -4,8 +4,13 @@ export type ZipReport = { id: number; [k: string]: unknown }
 type Entry = { report: ZipReport; image?: { name: string; bytes: Uint8Array } }
 
 const csvCell = (v: unknown) => {
-  const s = v == null ? '' : String(v)
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  let s = v == null ? '' : String(v)
+  // Neutralize spreadsheet formula/DDE injection: a cell that begins with
+  // =, +, -, @, tab or CR is executed as a formula by Excel/Sheets. The report
+  // title/description are fully attacker-controlled, so prefix such cells with a
+  // single quote before the normal quote-escaping.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 export async function buildReportsZip(entries: Entry[]): Promise<Uint8Array> {

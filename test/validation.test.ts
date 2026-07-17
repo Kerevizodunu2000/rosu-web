@@ -36,6 +36,12 @@ test('imageMagicOk checks signatures', () => {
   expect(imageMagicOk(new Uint8Array([0xff,0xd8,0xff]), 'image/jpeg')).toBe(true)
   expect(imageMagicOk(new Uint8Array([0x00,0x01]), 'image/png')).toBe(false)
 })
+test('webp magic requires WEBP at offset 8, not just RIFF', () => {
+  const riffOnly = new Uint8Array([0x52,0x49,0x46,0x46, 0,0,0,0, 0,0,0,0]) // RIFF container, not WEBP (e.g. WAV/AVI)
+  const webp = new Uint8Array([0x52,0x49,0x46,0x46, 0,0,0,0, 0x57,0x45,0x42,0x50])
+  expect(imageMagicOk(riffOnly, 'image/webp')).toBe(false)
+  expect(imageMagicOk(webp, 'image/webp')).toBe(true)
+})
 test('safeImageName ignores caller name', () => {
   expect(safeImageName('image/jpeg', 12)).toBe('rosu-12.jpg')
   expect(ALLOWED_MIME['image/webp']).toBe('webp')

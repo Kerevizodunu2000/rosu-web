@@ -2,7 +2,11 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import ZoomableShot from "@/components/ZoomableShot";
 import { DOWNLOAD_URL } from "@/lib/links";
+
+const DASHBOARD_ALT =
+  "Rosu dashboard showing 497 unpacked beatmaps in Output, with Unpack Archives, Import to osu!lazer or osu!(stable), and Back up to Drive actions above the beatmap list";
 
 function IconUnpack() {
   return (
@@ -133,7 +137,7 @@ export default function Home() {
     <>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="mx-auto grid max-w-6xl gap-14 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-28">
+        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-14 lg:py-28">
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-fg sm:text-5xl lg:text-[3.15rem] lg:leading-[1.08]">
               The tidy home for your{" "}
@@ -175,22 +179,28 @@ export default function Home() {
                 <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
                 <span className="chip ml-3">Rosu — Dashboard</span>
               </div>
-              <Image
+              <ZoomableShot
                 src="/screenshots/dashboard.png"
-                width={1278}
-                height={918}
-                alt="Rosu dashboard showing 497 unpacked beatmaps in Output, with Unpack Archives, Import to osu!lazer or osu!(stable), and Back up to Drive actions above the beatmap list"
-                priority
-                sizes="(min-width: 1024px) 480px, (min-width: 640px) 60vw, 100vw"
-                className="h-auto w-full"
-              />
+                alt={DASHBOARD_ALT}
+                label="Enlarge the Rosu dashboard screenshot"
+              >
+                <Image
+                  src="/screenshots/dashboard.png"
+                  width={1278}
+                  height={918}
+                  alt={DASHBOARD_ALT}
+                  priority
+                  sizes="(min-width: 1024px) 480px, (min-width: 640px) 60vw, 100vw"
+                  className="h-auto w-full transition-transform duration-200 group-hover:scale-[1.02]"
+                />
+              </ZoomableShot>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="border-t border-border">
+      <section id="features" className="scroll-mt-20 border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
@@ -219,7 +229,7 @@ export default function Home() {
       </section>
 
       {/* Screenshots — the real Rosu UI, running on Windows */}
-      <section id="screenshots" className="border-t border-border">
+      <section id="screenshots" className="scroll-mt-20 border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
@@ -239,15 +249,21 @@ export default function Home() {
                   <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
                   <span className="chip ml-3">{shot.chip}</span>
                 </div>
-                <Image
+                <ZoomableShot
                   src={shot.src}
-                  width={shot.width}
-                  height={shot.height}
                   alt={shot.alt}
-                  loading="lazy"
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  className="h-auto max-w-full object-contain"
-                />
+                  label={`Enlarge the ${shot.title} screenshot`}
+                >
+                  <Image
+                    src={shot.src}
+                    width={shot.width}
+                    height={shot.height}
+                    alt={shot.alt}
+                    loading="lazy"
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    className="h-auto max-w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                  />
+                </ZoomableShot>
                 <figcaption className="border-t border-border px-4 py-2.5 text-sm font-medium text-fg">
                   {shot.title}
                 </figcaption>

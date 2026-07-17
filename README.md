@@ -60,8 +60,10 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 
 | Route | What |
 |---|---|
-| `/` | Landing page |
+| `/` | Landing page (screenshots open in an accessible lightbox) |
 | `/report` | Report / contact form (Turnstile-protected) |
+| `/privacy` | Privacy Policy — bilingual (EN + TR) |
+| `/terms` | Terms — bilingual (EN + TR) |
 | `/admin` | Password-protected submissions viewer |
 | `POST /api/report` | Accepts the desktop app **and** the web form |
 | `GET /api/cron/archive` | Daily archive job (Vercel Cron) |
@@ -97,7 +99,7 @@ Set these in Vercel (Project → Settings → Environment Variables) and, for lo
 
 ## Privacy
 
-A submission contains only what the user types (title, description, optional contact e-mail), light diagnostics (app version, OS, UI language) and an optional screenshot the user attaches. No hidden telemetry. Raw IPs are never stored — only a salted hash, used solely for rate-limiting. What's sent is disclosed on the form.
+A submission contains only what the user types (title, description, optional contact e-mail), light diagnostics (app version, OS, UI language) and an optional screenshot the user attaches. No hidden telemetry. Raw IPs are never stored — only a salted hash, used solely for rate-limiting. What's sent is disclosed on the form, and the full bilingual (EN + TR) policy is published at [`/privacy`](https://rosu-web.vercel.app/privacy).
 
 ## Project structure
 

@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-export const LIMITS = { title: 200, description: 5000, contact: 200, imageBytes: Math.floor(3.5 * 1024 * 1024) } as const
+// imageBytes is the decoded-image cap. Kept at 3 MB so it matches the web
+// client's cap and stays reachable: a 3 MB image base64-inflates to ~4 MB, well
+// under both the route's 4.4 MB Content-Length guard and Vercel's 4.5 MB request
+// body limit — so an at-cap image degrades gracefully (text saved, image marked
+// error) instead of 413-ing the whole report.
+export const LIMITS = { title: 200, description: 5000, contact: 200, imageBytes: 3 * 1024 * 1024 } as const
 
 export const ALLOWED_MIME: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
@@ -43,7 +48,7 @@ export function imageMagicOk(b: Uint8Array, mime: string): boolean {
     case 'image/png':  return has(0x89, 0x50, 0x4e, 0x47)
     case 'image/jpeg': return has(0xff, 0xd8, 0xff)
     case 'image/gif':  return has(0x47, 0x49, 0x46, 0x38)
-    case 'image/webp': return has(0x52, 0x49, 0x46, 0x46) // "RIFF" (WEBP at 8)
+    case 'image/webp': return has(0x52, 0x49, 0x46, 0x46) && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 // "RIFF"…"WEBP"
     case 'image/bmp':  return has(0x42, 0x4d)
     default: return false
   }

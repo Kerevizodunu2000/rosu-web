@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseReport, imageMagicOk, safeImageName, LIMITS } from './validation'
-import { hashIp } from './crypto'
+import { hashIp, constantTimeEqual } from './crypto'
 
 export type ReportDeps = {
   salt: string; appToken: string; turnstileSecret: string
@@ -29,7 +29,7 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
     if (!(await deps.verifyTurnstile(turnstileToken, deps.turnstileSecret, { remoteIp: a.ip }))) return fail(200, 'captcha')
     source = 'web'
   } else if (isDesktop) {
-    if (!deps.appToken || v.token !== deps.appToken) return fail(200, 'unauthorized')
+    if (!deps.appToken || !constantTimeEqual(v.token, deps.appToken)) return fail(200, 'unauthorized')
     source = 'app'
   } else {
     return fail(200, 'captcha') // browser without a solved captcha

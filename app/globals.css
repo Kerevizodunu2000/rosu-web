@@ -157,11 +157,19 @@ body {
     background: color-mix(in srgb, var(--accent) 8%, var(--surface));
   }
 
+  /* Gradient headline text. Light mode uses the two darker brand stops so it
+     clears the 3:1 large-text contrast minimum on the light bg; dark mode keeps
+     the brighter accent → accent-2 gradient (already high-contrast on dark). */
   .text-gradient-accent {
-    background-image: linear-gradient(135deg, var(--accent), var(--accent-2));
+    background-image: linear-gradient(135deg, var(--accent-2), var(--accent-rose));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    .text-gradient-accent {
+      background-image: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
   }
 
   /* Form controls (report form, admin login) — recessed relative to the .card

@@ -13,10 +13,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_DESCRIPTION =
+  "Rosu unpacks osu! beatmap packs, dedupes them into one tidy Library, and imports into osu!(stable) or lazer. Free, open-source (GPL-3.0), Windows.";
+const SITE_TITLE = "Rosu — osu! beatmap-pack archive manager";
+
 export const metadata: Metadata = {
-  title: "Rosu — osu! beatmap-pack archive manager",
-  description:
-    "Rosu unpacks osu! beatmap packs, dedupes them into one tidy Library, and imports into osu!(stable) or lazer. Free, open-source (GPL-3.0), Windows.",
+  metadataBase: new URL("https://rosu-web.vercel.app"),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: "Rosu",
+  icons: { icon: "/rosu-mark.svg" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Rosu",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [{ url: "/screenshots/dashboard.png", width: 1278, height: 918, alt: "The Rosu dashboard" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/screenshots/dashboard.png"],
+  },
 };
 
 export default function RootLayout({

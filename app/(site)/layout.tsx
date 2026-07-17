@@ -11,8 +11,16 @@ export default function SiteLayout({
 }) {
   return (
     <>
+      <a
+        href="#main"
+        className="btn btn-secondary sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60]"
+      >
+        Skip to content
+      </a>
       <Nav />
-      <main className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
       <Footer />
     </>
   );

@@ -24,3 +24,6 @@ CREATE TABLE IF NOT EXISTS rate_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS rate_events_lookup_idx ON rate_events (ip_hash, created_at);
+-- Serves the global (all-IP) rate count and the periodic prune, both of which
+-- filter on created_at alone.
+CREATE INDEX IF NOT EXISTS rate_events_created_idx ON rate_events (created_at);

@@ -10,6 +10,50 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-18
+
+Compliance, accessibility, and hardening pass following independent code, design,
+security, and legal reviews.
+
+### Added
+- **Privacy Policy** (`/privacy`) — bilingual (EN + TR) GDPR/KVKK information notice
+  (controller, lawful basis, international transfer, retention, data-subject rights +
+  the right to complain to a supervisory authority), linked from the footer and the
+  report form.
+- **Terms** (`/terms`) — short bilingual "as-is / no warranty / GPL / unofficial" notice
+  with an abuse / IP contact.
+- **Click-to-zoom lightbox** on the landing screenshots (the hero dashboard and the
+  Packs/Search/Settings figures) — accessible (Escape + backdrop close, focus trap,
+  scroll lock), shared with the `/admin` image viewer.
+- **Social share metadata** (Open Graph + Twitter card) and a favicon.
+- **"Skip to content"** link for keyboard users.
+
+### Changed
+- Report form: focus now moves to the confirmation/error after submitting; the Turnstile
+  widget has a label, reserved height (no layout shift), and a hint on the disabled
+  submit; added a "Send another report" action and `aria-busy` while sending.
+- Light-mode gradient headline uses the darker brand stops so it clears the large-text
+  contrast minimum.
+- Extracted the archive job into `lib/archiveJob.ts`, shared by the cron and admin
+  routes (route modules no longer cross-import or export non-handlers).
+
+### Fixed
+- The nightly archive no longer wedges when a single screenshot can't be downloaded from
+  Drive — it archives the report text and continues.
+- Image size cap aligned with the request-body budget, so an at-cap screenshot degrades
+  gracefully (text saved, image flagged) instead of `413`-ing the whole report.
+- `rate_events` is pruned on each archive run and gained a `created_at` index, preventing
+  unbounded growth and slow global rate counts.
+
+### Security
+- Neutralized CSV formula / DDE injection in the archived `reports.csv`.
+- Added baseline security headers: `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and `Permissions-Policy`.
+- Desktop app-token comparison is now constant-time.
+- Required secrets (Drive credentials, IP-hash salt, Turnstile secret) fail loudly if
+  unset instead of silently degrading (e.g. an `"undefined"` hash salt).
+- Tightened WEBP validation to require the `WEBP` FourCC, not just a `RIFF` container.
+
 ## [1.0.0] - 2026-07-18
 
 First public release. Live at <https://rosu-web.vercel.app>.
@@ -37,5 +81,6 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Kerevizodunu2000/rosu-web/releases/tag/v1.0.0

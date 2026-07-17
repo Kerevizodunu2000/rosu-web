@@ -23,3 +23,21 @@ test('bundles, uploads, marks, deletes', async () => {
   expect(r.archived).toBe(2); expect(marked).toEqual([1, 2]); expect(deleted).toEqual(['D1'])
   const zip = await JSZip.loadAsync(uploaded!); expect(zip.file('images/rosu-1.png')).toBeTruthy()
 })
+test('a failed image download does not wedge the archive', async () => {
+  let marked: number[] = []; let uploaded: Uint8Array | null = null
+  const deps: ArchiveDeps = {
+    listUnarchived: async () => [
+      { id: 1, title: 't', image_status: 'stored', image_drive_id: 'GONE', image_name: 'rosu-1.png' } as any,
+      { id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null } as any,
+    ],
+    downloadImage: async () => { throw new Error('image deleted in Drive') },
+    uploadArchive: async (_name, bytes) => { uploaded = bytes; return 'AID' },
+    markArchived: async (ids) => { marked = ids },
+    deleteImage: async () => {},
+  }
+  const r = await runArchive(deps, '20260718')
+  expect(r.archived).toBe(2)              // both reports still archived
+  expect(marked).toEqual([1, 2])
+  const zip = await JSZip.loadAsync(uploaded!)
+  expect(zip.file('images/rosu-1.png')).toBeNull() // the unreadable image is simply omitted
+})
