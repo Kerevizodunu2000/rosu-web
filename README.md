@@ -25,9 +25,11 @@ under [`reference/apps-script/`](./reference/apps-script/).
 
 ## Status
 
-Not yet scaffolded. See `HANDOFF.md` §11 for the first steps.
+Scaffolded (Next.js App Router + TypeScript + Tailwind + ESLint + Vitest). See `HANDOFF.md` §11 for next steps.
 
 ## Related
 
 - Desktop app: <https://github.com/Kerevizodunu2000/rosu> (GPL-3.0, public)
 - Contact: rosu.app@gmail.com
+
+License: GPL-3.0-or-later
