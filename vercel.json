@@ -1,0 +1,1 @@
+{ "crons": [ { "path": "/api/cron/archive?key=__SET_IN_VERCEL__", "schedule": "0 3 * * *" } ] }
