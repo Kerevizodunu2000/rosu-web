@@ -21,6 +21,10 @@ function getDrive(): DriveClient {
 }
 
 export async function POST(req: NextRequest) {
+  const MAX_BODY = Math.floor(4.4 * 1024 * 1024)
+  const contentLength = Number(req.headers.get('content-length') || 0)
+  if (contentLength > MAX_BODY) return NextResponse.json({ ok: false, error: 'too_large' }, { status: 413 })
+
   let raw: unknown
   try { raw = await req.json() } catch { return NextResponse.json({ ok: false, error: 'bad_json' }, { status: 400 }) }
 

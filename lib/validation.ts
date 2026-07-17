@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-export const LIMITS = { title: 200, description: 5000, contact: 200, imageBytes: 6 * 1024 * 1024 } as const
+export const LIMITS = { title: 200, description: 5000, contact: 200, imageBytes: Math.floor(3.5 * 1024 * 1024) } as const
 
 export const ALLOWED_MIME: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',

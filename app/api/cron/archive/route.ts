@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runArchive } from '@/lib/archiveService'
 import { DriveClient } from '@/lib/drive'
 import { getSql, listUnarchived, markArchived } from '@/lib/db'
+import { constantTimeEqual } from '@/lib/crypto'
 export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
+  const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
-  const key = new URL(req.url).searchParams.get('key')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}` && key !== process.env.CRON_SECRET)
-    return NextResponse.json({ ok: false }, { status: 401 })
+  if (!secret || !constantTimeEqual(auth, `Bearer ${secret}`)) return NextResponse.json({ ok: false }, { status: 401 })
   return NextResponse.json({ ok: true, ...(await archiveNow()) })
 }
 

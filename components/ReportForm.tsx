@@ -29,7 +29,7 @@ declare global {
 }
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // client-side cap; server allows a bit more headroom
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // client-side cap; server allows a bit more headroom
 const ACCEPT_MIME = Object.keys(ALLOWED_MIME).join(","); // e.g. "image/png,image/jpeg,..."
 
 type Screenshot = { name: string; mime: string; b64: string; previewUrl: string };
@@ -325,7 +325,7 @@ export default function ReportForm() {
             )}
           </div>
 
-          <p className="field-hint">PNG, JPEG, GIF, WEBP, or BMP — up to 4 MB.</p>
+          <p className="field-hint">PNG, JPEG, GIF, WEBP, or BMP — up to 3 MB.</p>
           {fileError && (
             <p className="field-error" role="alert">
               {fileError}
