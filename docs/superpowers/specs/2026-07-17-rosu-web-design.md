@@ -66,6 +66,31 @@ contact form must always answer).
 - **Cron:** Vercel Cron (Hobby: once/day) for periodic archiving, plus a manual
   "Archive now" button in `/admin`.
 
+### 4.1 Why a database *in addition to* Drive (decided 2026-07-17)
+
+Drive is object storage, not a query engine, so it cannot cheaply serve the
+per-request needs of a public write endpoint. Neon (also free, no-card) is a tiny
+**query index**, not redundant storage — images and archive ZIPs still live only
+in Drive. Neon exists for four things Drive can't do well:
+
+1. **Rate limiting** — every `/api/report` must ask "how many requests from this
+   IP-hash in the last minute/day?" (`SELECT count(*) … WHERE ip_hash=? AND
+   created_at > …`). This is essential for the **captcha-less desktop path** and
+   to bound Drive fill from abuse. Drive would require listing+reading files per
+   request (slow, quota-limited, racy).
+2. **Atomic `id`** for the `{ok:true, id}` response under concurrency.
+3. **`/admin` listing** — recent/sorted/filtered in one SQL query vs.
+   list-folder + download-every-JSON.
+4. **Status tracking** — which images are staged (`Inbox`) vs. archived, so the
+   cron job knows what to bundle and delete.
+
+Neon stores only text rows + rate-limit events, so the 0.5 GB free tier is
+effectively unbounded here. A "Drive-only, no DB" option was considered and
+rejected: it loses real per-IP rate limiting (weakening a public, spam-exposed
+endpoint) and degrades `/admin` to folder browsing. (Swappable equivalents if
+ever needed: Turso/SQLite same architecture; Firestore keeps everything in the
+same Google account at the cost of NoSQL + Admin SDK.)
+
 ## 5. Architecture & data flow
 
 ### 5.1 Report submission — `POST /api/report` (desktop **and** web)
