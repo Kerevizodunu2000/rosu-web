@@ -94,6 +94,40 @@ const features: { title: string; blurb: string; icon: ReactNode }[] = [
   },
 ];
 
+const screenshots: {
+  title: string;
+  chip: string;
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+}[] = [
+  {
+    title: "Packs",
+    chip: "Rosu — Packs",
+    src: "/screenshots/packs.png",
+    width: 1906,
+    height: 918,
+    alt: "Rosu Packs tab: a table of beatmap packs with category, series, code, title, and track columns",
+  },
+  {
+    title: "Search",
+    chip: "Rosu — Search",
+    src: "/screenshots/search.png",
+    width: 1908,
+    height: 920,
+    alt: "Rosu Search tab for finding beatmaps and packs in your Library",
+  },
+  {
+    title: "Settings",
+    chip: "Rosu — Settings",
+    src: "/screenshots/settings.png",
+    width: 1909,
+    height: 918,
+    alt: "Rosu Settings tab with app preferences and configuration options",
+  },
+];
+
 export default function Home() {
   return (
     <>
@@ -124,32 +158,32 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="relative mx-auto h-[300px] w-full max-w-sm sm:h-[360px]" aria-hidden="true">
-            <div className="float-idle absolute inset-0">
-              <div className="card absolute left-2 top-4 h-32 w-24 -rotate-[12deg] p-3 sm:h-36 sm:w-28">
-                <span className="block h-1.5 w-7 rounded-full bg-accent/70" />
-                <span className="mt-3 block h-1.5 w-full rounded-full bg-border" />
-                <span className="mt-1.5 block h-1.5 w-4/5 rounded-full bg-border" />
-                <span className="mt-1.5 block h-1.5 w-3/5 rounded-full bg-border" />
-              </div>
+          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+            <div
+              className="absolute -inset-8 -z-10 rounded-[2.5rem] blur-2xl"
+              style={{
+                background:
+                  "radial-gradient(closest-side, rgba(255,46,151,0.3), transparent 70%)",
+              }}
+              aria-hidden="true"
+            />
 
-              <div className="card absolute bottom-3 right-1 h-36 w-28 rotate-[9deg] p-3 sm:h-40 sm:w-32">
-                <span className="block h-1.5 w-7 rounded-full bg-accent-2/70" />
-                <span className="mt-3 block h-1.5 w-full rounded-full bg-border" />
-                <span className="mt-1.5 block h-1.5 w-3/5 rounded-full bg-border" />
-                <span className="mt-1.5 block h-1.5 w-4/5 rounded-full bg-border" />
+            <div className="float-idle card overflow-hidden">
+              <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                <span className="chip ml-3">Rosu — Dashboard</span>
               </div>
-
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Image
-                  src="/rosu-mark.svg"
-                  width={168}
-                  height={168}
-                  alt=""
-                  priority
-                  className="drop-shadow-[0_18px_36px_rgba(255,46,151,0.35)]"
-                />
-              </div>
+              <Image
+                src="/screenshots/dashboard.png"
+                width={1278}
+                height={918}
+                alt="Rosu dashboard showing 497 unpacked beatmaps in Output, with Unpack Archives, Import to osu!lazer or osu!(stable), and Back up to Drive actions above the beatmap list"
+                priority
+                sizes="(min-width: 1024px) 480px, (min-width: 640px) 60vw, 100vw"
+                className="h-auto w-full"
+              />
             </div>
           </div>
         </div>
@@ -184,45 +218,41 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Preview — stylized, not a real screenshot (none exist yet) */}
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-20 sm:px-8">
-          <div className="mx-auto max-w-xl text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
-              A quiet, tidy Library
+      {/* Screenshots — the real Rosu UI, running on Windows */}
+      <section id="screenshots" className="border-t border-border">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
+              A look inside
             </h2>
             <p className="mt-3 text-fg-muted">
-              Real screenshots are coming soon — here&apos;s the idea.
+              Rosu&apos;s actual interface: Packs, Search, and Settings, running on Windows.
             </p>
           </div>
 
-          <div className="card mx-auto mt-10 max-w-3xl overflow-hidden">
-            <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-              <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-              <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-              <span className="chip ml-3">Rosu — Library</span>
-            </div>
-
-            <div className="grid gap-6 p-6 sm:grid-cols-[128px_1fr] sm:p-8">
-              <div className="hidden flex-col gap-2 sm:flex">
-                <span className="chip justify-start">Library</span>
-                <span className="chip justify-start text-fg-muted/70">Missing</span>
-                <span className="chip justify-start text-fg-muted/70">Backups</span>
-              </div>
-
-              <div className="relative grid grid-cols-4 gap-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="aspect-square rounded-xl border border-border"
-                    style={{
-                      background: `linear-gradient(160deg, rgba(255,102,170,${0.1 + (i % 4) * 0.05}), rgba(255,46,151,${0.04 + (i % 3) * 0.04}))`,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {screenshots.map((shot) => (
+              <figure key={shot.title} className="card overflow-hidden">
+                <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
+                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
+                  <span className="chip ml-3">{shot.chip}</span>
+                </div>
+                <Image
+                  src={shot.src}
+                  width={shot.width}
+                  height={shot.height}
+                  alt={shot.alt}
+                  loading="lazy"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  className="h-auto max-w-full object-contain"
+                />
+                <figcaption className="border-t border-border px-4 py-2.5 text-sm font-medium text-fg">
+                  {shot.title}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </div>
       </section>
