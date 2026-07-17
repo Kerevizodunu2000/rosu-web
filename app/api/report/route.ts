@@ -5,6 +5,7 @@ import { verifyTurnstile } from '@/lib/turnstile'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { getSql, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince } from '@/lib/db'
 import { DriveClient } from '@/lib/drive'
+import { clientIp } from '@/lib/net'
 
 export const runtime = 'nodejs'
 
@@ -17,11 +18,6 @@ function getDrive(): DriveClient {
     })
   }
   return _drive
-}
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get('x-forwarded-for') || ''
-  return xff.split(',')[0].trim() || '0.0.0.0'
 }
 
 export async function POST(req: NextRequest) {
