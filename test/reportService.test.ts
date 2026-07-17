@@ -49,3 +49,26 @@ test('valid image is uploaded and recorded', async () => {
     deps: baseDeps({ setReportImage: async (_id, v) => { imaged = v.image_status } }) })
   expect(r.body.ok).toBe(true); expect(imaged).toBe('stored')
 })
+test('browser with neither auth path → captcha', async () => {
+  const r = await handleReport({ raw: { title: 't', description: 'd', hp: '' }, ip: '1.1.1.1', userAgent: 'Mozilla/5.0',
+    deps: baseDeps() })
+  expect(r.body).toEqual({ ok: false, error: 'captcha' })
+})
+test('desktop path with empty appToken → unauthorized (fail closed)', async () => {
+  const r = await handleReport({ raw: { title: 't', description: 'd', hp: '', token: '' }, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3',
+    deps: baseDeps({ appToken: '' }) })
+  expect(r.body).toEqual({ ok: false, error: 'unauthorized' })
+})
+test('invalid image (bad magic bytes) → report saved, image_status error, upload not attempted', async () => {
+  const bad = Buffer.from([0, 1, 2, 3]).toString('base64')
+  let imaged = ''
+  let uploadCalled = false
+  const r = await handleReport({ raw: { ...desktop, image_b64: bad, image_mime: 'image/png' }, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3',
+    deps: baseDeps({
+      setReportImage: async (_id, v) => { imaged = v.image_status },
+      uploadImage: async () => { uploadCalled = true; throw new Error('uploadImage should not be called') },
+    }) })
+  expect(r.body).toEqual({ ok: true, id: 7 })
+  expect(imaged).toBe('error')
+  expect(uploadCalled).toBe(false)
+})

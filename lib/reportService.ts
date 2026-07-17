@@ -21,14 +21,15 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
   const v = parsed.value
   if (v.hp) return ok(0) // honeypot: look successful, store nothing
 
-  const turnstileToken = typeof (a.raw as any)?.turnstileToken === 'string' ? (a.raw as any).turnstileToken : ''
+  const rawObj = a.raw as Record<string, unknown> | null
+  const turnstileToken = typeof rawObj?.turnstileToken === 'string' ? rawObj.turnstileToken : ''
   const isDesktop = /^Rosu\//.test(a.userAgent)
   let source: 'app' | 'web'
   if (turnstileToken) {
     if (!(await deps.verifyTurnstile(turnstileToken, deps.turnstileSecret, { remoteIp: a.ip }))) return fail(200, 'captcha')
     source = 'web'
   } else if (isDesktop) {
-    if (v.token !== deps.appToken) return fail(200, 'unauthorized')
+    if (!deps.appToken || v.token !== deps.appToken) return fail(200, 'unauthorized')
     source = 'app'
   } else {
     return fail(200, 'captcha') // browser without a solved captcha
