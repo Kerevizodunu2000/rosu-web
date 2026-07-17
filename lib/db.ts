@@ -40,15 +40,24 @@ export async function setReportImage(sql: Sql, id: number, v: {
     image_mime = ${v.image_mime ?? null} WHERE id = ${id}`
 }
 
+const iso = (v: unknown): string | null =>
+  v == null ? null : v instanceof Date ? v.toISOString() : String(v)
+function normalizeReport(row: Record<string, unknown>): ReportRecord {
+  return { ...(row as ReportRecord), id: Number(row.id),
+    created_at: iso(row.created_at) as string, archived_at: iso(row.archived_at) }
+}
+
 export async function listRecentUnarchived(sql: Sql, limit: number): Promise<ReportRecord[]> {
-  return await sql`SELECT * FROM reports WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT ${limit}` as ReportRecord[]
+  const rows = await sql`SELECT * FROM reports WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT ${limit}` as Record<string, unknown>[]
+  return rows.map(normalizeReport)
 }
 export async function listReportById(sql: Sql, id: number): Promise<ReportRecord | null> {
-  const rows = await sql`SELECT * FROM reports WHERE id = ${id}` as ReportRecord[]
-  return rows[0] ?? null
+  const rows = await sql`SELECT * FROM reports WHERE id = ${id}` as Record<string, unknown>[]
+  return rows[0] ? normalizeReport(rows[0]) : null
 }
 export async function listUnarchived(sql: Sql): Promise<ReportRecord[]> {
-  return await sql`SELECT * FROM reports WHERE archived_at IS NULL ORDER BY created_at ASC` as ReportRecord[]
+  const rows = await sql`SELECT * FROM reports WHERE archived_at IS NULL ORDER BY created_at ASC` as Record<string, unknown>[]
+  return rows.map(normalizeReport)
 }
 export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<void> {
   if (!ids.length) return
