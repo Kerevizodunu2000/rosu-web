@@ -1,27 +1,173 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 @import "tailwindcss";
 
+/*
+ * Rosu brand tokens — pink rose/gem motif, light/dark aware.
+ * These are the canonical brand tokens for the whole site: reuse them
+ * (don't invent new hexes) in later pages (/report, /admin, etc).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  color-scheme: light dark;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Accents (fixed brand palette) */
+  --accent: #ff66aa;
+  --accent-2: #ff2e97;
+  --accent-rose: #e0405e; /* secondary/deep accent */
+  --on-accent: #211f2b; /* ink text color used on top of the accent gradient, constant across themes */
+
+  /* Surfaces + text (light) */
+  --bg: #f4f3f9;
+  --bg-glow: rgba(255, 102, 170, 0.18);
+  --surface: #ffffff;
+  --border: rgba(0, 0, 0, 0.06);
+  --text: #211f2b;
+  --text-muted: #6a6a80;
+
+  /* Shape + elevation */
+  --radius-card: 22px;
+  --radius-pill: 999px;
+  --shadow-card:
+    0 24px 48px -28px rgba(224, 64, 94, 0.35),
+    0 2px 10px rgba(224, 64, 94, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #121019;
+    --bg-glow: rgba(255, 102, 170, 0.24);
+    --surface: #1b1926;
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #ecebf5;
+    --text-muted: #a6a5c0;
+    --shadow-card:
+      0 24px 48px -24px rgba(0, 0, 0, 0.55),
+      0 2px 12px rgba(255, 102, 170, 0.14);
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-fg: var(--text);
+  --color-fg-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-rose: var(--accent-rose);
+  --color-on-accent: var(--on-accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(130% 100% at 50% -20%, var(--bg-glow), transparent 62%), var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Consistent, visible focus indication for every interactive element on every page. */
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reusable surface + control primitives, shared across pages (landing, /report, /admin). */
+@layer components {
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0.3rem 0.75rem;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-pill);
+    padding: 0.7rem 1.35rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition:
+      transform 180ms ease-out,
+      box-shadow 180ms ease-out,
+      border-color 180ms ease-out,
+      color 180ms ease-out,
+      background-color 180ms ease-out;
+  }
+
+  .btn-primary {
+    background-image: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: var(--on-accent);
+    box-shadow: 0 14px 30px -14px rgba(255, 46, 151, 0.55);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 34px -14px rgba(255, 46, 151, 0.65);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover {
+    border-color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+
+  .text-gradient-accent {
+    background-image: linear-gradient(135deg, var(--accent), var(--accent-2));
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .float-idle {
+    animation: float-idle 6s ease-in-out infinite;
+  }
+}
+
+@keyframes float-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
