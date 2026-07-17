@@ -54,11 +54,17 @@ const b64url = (buf) =>
   buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 function openBrowser(url) {
+  // On Windows, `cmd /c start <url>` splits the URL at the first `&`, so Google
+  // only receives `client_id=…` and rejects it ("missing response_type").
+  // rundll32's FileProtocolHandler is spawned directly (no shell), so the full
+  // URL — ampersands and all — reaches the default browser intact.
   try {
-    if (process.platform === "win32") spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true }).unref();
-    else if (process.platform === "darwin") spawn("open", [url], { stdio: "ignore", detached: true }).unref();
+    if (process.platform === "win32")
+      spawn("rundll32", ["url.dll,FileProtocolHandler", url], { stdio: "ignore", detached: true }).unref();
+    else if (process.platform === "darwin")
+      spawn("open", [url], { stdio: "ignore", detached: true }).unref();
     else spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
-  } catch { /* user can paste the URL manually */ }
+  } catch { /* fall back to the printed URL — copy/paste it manually */ }
 }
 
 const { id, secret } = loadClient();
