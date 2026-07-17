@@ -10,6 +10,10 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-18
+
+First public release. Live at <https://rosu-web.vercel.app>.
+
 ### Added
 - **Landing page** (`/`) — Rosu brand (own rose/gem mark, light/dark aware), feature
   highlights, and a Download button to the desktop app's GitHub Releases.
@@ -33,4 +37,5 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/commits/main
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Kerevizodunu2000/rosu-web/releases/tag/v1.0.0
