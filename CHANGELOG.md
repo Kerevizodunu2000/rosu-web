@@ -10,10 +10,14 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-18
+
 ### Added
 - Community health files: code of conduct (Contributor Covenant 2.1), contributing
   guide, security policy, issue templates (bug/feature + contact links), and a pull
-  request template.
+  request template. GitHub community-standards checklist now passes at 100%.
+- GitHub private vulnerability reporting enabled, so `SECURITY.md`'s advisory link
+  works.
 
 ## [1.2.0] - 2026-07-18
 
@@ -118,7 +122,8 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Kerevizodunu2000/rosu-web/releases/tag/v1.0.0
