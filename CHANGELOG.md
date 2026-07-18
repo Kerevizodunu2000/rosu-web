@@ -10,6 +10,11 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+### Changed
+- The "A look inside" screenshots section now states which desktop release the
+  screenshots were captured from (Rosu v1.3.3), with a version chip next to the
+  heading.
+
 ## [1.2.1] - 2026-07-18
 
 ### Added

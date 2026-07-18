@@ -99,6 +99,11 @@ const features: { title: string; blurb: string; icon: ReactNode }[] = [
   },
 ];
 
+// Which desktop release the screenshots below were captured from. Update this
+// (and the images) together when refreshing them, so the site never shows an
+// unlabeled/outdated UI.
+const SHOTS_APP_VERSION = "1.3.3";
+
 const screenshots: CarouselShot[] = [
   {
     title: "Packs",
@@ -249,12 +254,17 @@ export default function Home() {
       <section id="screenshots" className="scroll-mt-20 border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
           <div className="max-w-2xl">
-            <h2 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-              A look inside
-            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
+                A look inside
+              </h2>
+              <span className="chip">Rosu v{SHOTS_APP_VERSION}</span>
+            </div>
             <p className="mt-3 text-fg-muted">
               Rosu&apos;s actual interface — Packs, Search, Artists, Shortcuts, Logs, and
-              Settings — rotating below. Click any card to inspect it up close.
+              Settings — captured in <strong className="text-fg">Rosu v{SHOTS_APP_VERSION}</strong>{" "}
+              and rotating below. Newer releases may look slightly different. Click any card to
+              inspect it up close.
             </p>
           </div>
 
