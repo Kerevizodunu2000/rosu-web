@@ -17,6 +17,11 @@ const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const clampScale = (s: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
 
+// Drag-gesture thresholds (px) at scale 1: a mostly-horizontal drag past
+// SWIPE_NAV navigates the gallery; any drag past SWIPE_DISMISS closes.
+const SWIPE_NAV = 80;
+const SWIPE_DISMISS = 130;
+
 function IconX() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -37,7 +42,9 @@ function IconChevron({ dir }: { dir: "left" | "right" }) {
  * - Rendered through a portal to <body> so an ancestor `transform` (e.g. the
  *   hero card's float animation) can't trap the fixed overlay inside it.
  * - Escape / backdrop close; Left/Right arrows navigate; Tab is trapped.
- * - Mouse wheel zooms the current image (1×–4×); drag pans while zoomed.
+ * - Mouse wheel zooms the current image (1×–4×); while zoomed, dragging pans.
+ * - At normal zoom, grab-and-drag: a horizontal drag flicks to the prev/next
+ *   image (gallery), and dragging far enough in any direction dismisses.
  * - Focus moves to the close button on open and is restored on close.
  * The parent controls mounting — render <Lightbox …/> only while open.
  */
@@ -55,10 +62,17 @@ export default function Lightbox({
 
   const [index, setIndex] = useState(startIndex);
   const [dir, setDir] = useState(0); // -1 prev, 1 next, 0 initial open
+
+  // Zoom + pan (active while scale > 1).
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+
+  // Swipe gesture (active at scale 1): follow the pointer, then decide.
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const [swipe, setSwipe] = useState({ dx: 0, dy: 0 });
+  const [swiping, setSwiping] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -71,18 +85,21 @@ export default function Lightbox({
     setScale(1);
     setPan({ x: 0, y: 0 });
   }, []);
+
   const go = useCallback(
     (delta: number) => {
       if (count <= 1) return;
-      resetZoom();
+      setScale(1);
+      setPan({ x: 0, y: 0 });
+      setSwipe({ dx: 0, dy: 0 });
+      setSwiping(false);
       setDir(delta);
       setIndex((i) => (i + delta + count) % count);
     },
-    [count, resetZoom]
+    [count]
   );
 
-  // Mount-only: lock background scroll, focus the close button, and restore both
-  // on unmount. Kept separate from the key handler so it never re-captures focus.
+  // Mount-only: lock background scroll, focus the close button, restore both on unmount.
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
@@ -140,7 +157,7 @@ export default function Lightbox({
   }, [go]);
 
   // Wheel-to-zoom. Attached natively with { passive: false } so preventDefault
-  // actually suppresses the (locked) page scroll and the gesture zooms instead.
+  // actually suppresses page scroll and the gesture zooms instead.
   useEffect(() => {
     const el = dialogRef.current;
     if (!el) return;
@@ -157,21 +174,58 @@ export default function Lightbox({
   }, []);
 
   function onPointerDown(e: ReactPointerEvent<HTMLImageElement>) {
-    if (scale <= 1) return;
-    dragRef.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
-    setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
+    if (scale > 1) {
+      panStart.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
+      setPanning(true);
+    } else {
+      swipeStart.current = { x: e.clientX, y: e.clientY };
+      setSwiping(true);
+    }
   }
   function onPointerMove(e: ReactPointerEvent<HTMLImageElement>) {
-    const d = dragRef.current;
-    if (!d) return;
-    setPan({ x: d.ox + (e.clientX - d.x), y: d.oy + (e.clientY - d.y) });
+    if (panStart.current) {
+      const p = panStart.current;
+      setPan({ x: p.ox + (e.clientX - p.x), y: p.oy + (e.clientY - p.y) });
+      return;
+    }
+    if (swipeStart.current) {
+      const s = swipeStart.current;
+      setSwipe({ dx: e.clientX - s.x, dy: e.clientY - s.y });
+    }
   }
-  function endDrag() {
-    dragRef.current = null;
-    setDragging(false);
+  function onPointerUp(e: ReactPointerEvent<HTMLImageElement>) {
+    if (panStart.current) {
+      panStart.current = null;
+      setPanning(false);
+      return;
+    }
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (hasGallery && Math.abs(dx) > SWIPE_NAV && Math.abs(dx) > Math.abs(dy)) {
+      go(dx < 0 ? 1 : -1); // dragging left pulls in the next image
+      return;
+    }
+    if (Math.hypot(dx, dy) > SWIPE_DISMISS) {
+      onCloseRef.current();
+      return;
+    }
+    // Below every threshold — spring back.
+    setSwiping(false);
+    setSwipe({ dx: 0, dy: 0 });
+  }
+  function onPointerCancel() {
+    panStart.current = null;
+    swipeStart.current = null;
+    setPanning(false);
+    setSwiping(false);
+    setSwipe({ dx: 0, dy: 0 });
   }
 
+  const swipeDist = Math.hypot(swipe.dx, swipe.dy);
   const figureAnim = dir === 1 ? "lb-from-right" : dir === -1 ? "lb-from-left" : "lb-open";
 
   const overlay = (
@@ -199,20 +253,21 @@ export default function Lightbox({
         onClick={(e) => e.stopPropagation()}
         className={`${figureAnim} relative m-0 flex max-h-full max-w-full flex-col items-center`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- full-res enlargement (public asset or proxied admin image), zoom/pan handled here */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- full-res enlargement (public asset or proxied admin image), zoom/pan/swipe handled here */}
         <img
           src={current.src}
           alt={current.alt}
           draggable={false}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
           onDoubleClick={resetZoom}
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-            transition: dragging ? "none" : "transform 120ms ease-out",
-            cursor: scale > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
+            transform: `translate(${pan.x + swipe.dx}px, ${pan.y + swipe.dy}px) scale(${scale})`,
+            opacity: swiping && swipeDist > 0 ? Math.max(0.35, 1 - swipeDist / 480) : 1,
+            transition: panning || swiping ? "none" : "transform 180ms ease-out, opacity 180ms ease-out",
+            cursor: panning || swiping ? "grabbing" : "grab",
             touchAction: "none",
           }}
           className="max-h-[84vh] max-w-[92vw] select-none rounded-xl border border-white/10 object-contain shadow-2xl"

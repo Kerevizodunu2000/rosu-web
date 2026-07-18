@@ -10,6 +10,27 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-18
+
+### Added
+- **Screenshot carousel** — the "A look inside" section now rotates through six
+  screenshots (Packs, Search, Artists, Shortcuts, Logs, Settings) across three cards
+  with a staggered slide animation, dot navigation, pause on hover/focus, and
+  reduced-motion support.
+- **Drag gestures in the lightbox** — grab the enlarged image and drag horizontally to
+  flick to the previous/next screenshot; drag far enough in any direction to dismiss
+  (with a follow-the-pointer fade). Wheel-zoom and drag-pan while zoomed unchanged.
+- **Threshold auto-archive** — when `AUTO_ARCHIVE_THRESHOLD` (default 25) unarchived
+  reports pile up, the backend bundles them to Drive right after responding, instead of
+  waiting for the nightly cron (which remains the backstop).
+- **Consent line on the report form** — "By sending, you agree to our Privacy Policy and
+  Terms." at the point of collection (transparency line, deliberately not a consent
+  checkbox — processing rests on legitimate interest).
+
+### Fixed
+- GitHub contributor cache refreshed after the history rewrite, removing a stale
+  co-author from the repository sidebar.
+
 ## [1.1.0] - 2026-07-18
 
 Compliance, accessibility, and hardening pass following independent code, design,
@@ -92,6 +113,7 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Kerevizodunu2000/rosu-web/releases/tag/v1.0.0

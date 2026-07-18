@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import Link from "next/link";
 import Script from "next/script";
 import { LIMITS, ALLOWED_MIME } from "@/lib/validation";
-import { CONTACT_EMAIL } from "@/lib/links";
+import { CONTACT_EMAIL, PRIVACY_PATH, TERMS_PATH } from "@/lib/links";
 
 // Cloudflare's script attaches a global `window.turnstile`; we drive it via the
 // explicit render API (not the implicit `cf-turnstile` div) so we can reset the
@@ -418,6 +418,19 @@ export default function ReportForm() {
             Complete the check above to enable sending.
           </p>
         )}
+        {/* Transparency line at the point of collection (KVKK/GDPR): links, not a
+            consent checkbox — processing rests on legitimate interest, not opt-in. */}
+        <p className="field-hint">
+          By sending, you agree to our{" "}
+          <Link href={PRIVACY_PATH} className="text-accent-2 underline underline-offset-2">
+            Privacy Policy
+          </Link>{" "}
+          and{" "}
+          <Link href={TERMS_PATH} className="text-accent-2 underline underline-offset-2">
+            Terms
+          </Link>
+          .
+        </p>
       </div>
     </form>
   );

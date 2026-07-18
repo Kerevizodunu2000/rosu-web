@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { handleReport } from '@/lib/reportService'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { checkRateLimit } from '@/lib/ratelimit'
-import { getSql, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince } from '@/lib/db'
+import { runArchiveJob } from '@/lib/archiveJob'
+import { getSql, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince, countUnarchived } from '@/lib/db'
 import { DriveClient } from '@/lib/drive'
 import { clientIp } from '@/lib/net'
 import { requireEnv } from '@/lib/env'
@@ -53,6 +54,20 @@ export async function POST(req: NextRequest) {
         },
       },
     })
+    // Threshold auto-archive: once enough reports pile up, bundle them to Drive
+    // right away instead of waiting for the nightly cron (which stays as the
+    // backstop). Runs after the response is sent; best-effort — a rare
+    // concurrent trigger can only produce a duplicate zip, never lose data.
+    if (result.body.ok && result.body.id) {
+      after(async () => {
+        try {
+          const threshold = Number(process.env.AUTO_ARCHIVE_THRESHOLD ?? 25)
+          if (Number.isFinite(threshold) && threshold > 0 && (await countUnarchived(sql)) >= threshold) {
+            await runArchiveJob()
+          }
+        } catch { /* nightly cron will pick it up */ }
+      })
+    }
     return NextResponse.json(result.body, { status: result.status })
   } catch {
     return NextResponse.json({ ok: false, error: 'server' }, { status: 500 })

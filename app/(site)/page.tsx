@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import ZoomableShot from "@/components/ZoomableShot";
+import ShotCarousel, { type CarouselShot } from "@/components/ShotCarousel";
 import { DOWNLOAD_URL } from "@/lib/links";
 
 const DASHBOARD_ALT =
@@ -98,20 +99,13 @@ const features: { title: string; blurb: string; icon: ReactNode }[] = [
   },
 ];
 
-const screenshots: {
-  title: string;
-  chip: string;
-  src: string;
-  width: number;
-  height: number;
-  alt: string;
-}[] = [
+const screenshots: CarouselShot[] = [
   {
     title: "Packs",
     chip: "Rosu — Packs",
     src: "/screenshots/packs.png",
     width: 1906,
-    height: 918,
+    height: 917,
     alt: "Rosu Packs tab: a table of beatmap packs with category, series, code, title, and track columns",
   },
   {
@@ -123,6 +117,30 @@ const screenshots: {
     alt: "Rosu Search tab for finding beatmaps and packs in your Library",
   },
   {
+    title: "Artists",
+    chip: "Rosu — Artists",
+    src: "/screenshots/artists.png",
+    width: 1904,
+    height: 916,
+    alt: "Rosu Artists tab: per-artist stats (song count, average length and BPM) next to every beatmap by the selected artist",
+  },
+  {
+    title: "Shortcuts",
+    chip: "Rosu — Shortcuts",
+    src: "/screenshots/shortcuts.png",
+    width: 1276,
+    height: 921,
+    alt: "Rosu Shortcuts tab: installed-music counts, one-click transfers between osu! clients, Library export, and the job queue",
+  },
+  {
+    title: "Logs",
+    chip: "Rosu — Logs",
+    src: "/screenshots/logs.png",
+    width: 1902,
+    height: 916,
+    alt: "Rosu Logs tab: a timestamped activity log with a one-click Excel report export",
+  },
+  {
     title: "Settings",
     chip: "Rosu — Settings",
     src: "/screenshots/settings.png",
@@ -131,10 +149,6 @@ const screenshots: {
     alt: "Rosu Settings tab with app preferences and configuration options",
   },
 ];
-
-// The three screenshots form one lightbox gallery, so the enlarged view can page
-// left/right between them.
-const galleryImages = screenshots.map((s) => ({ src: s.src, alt: s.alt, caption: s.title }));
 
 export default function Home() {
   return (
@@ -239,39 +253,13 @@ export default function Home() {
               A look inside
             </h2>
             <p className="mt-3 text-fg-muted">
-              Rosu&apos;s actual interface: Packs, Search, and Settings, running on Windows.
+              Rosu&apos;s actual interface — Packs, Search, Artists, Shortcuts, Logs, and
+              Settings — rotating below. Click any card to inspect it up close.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {screenshots.map((shot, idx) => (
-              <figure key={shot.title} className="card overflow-hidden">
-                <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
-                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
-                  <span className="chip ml-3">{shot.chip}</span>
-                </div>
-                <ZoomableShot
-                  images={galleryImages}
-                  index={idx}
-                  label={`Enlarge the ${shot.title} screenshot`}
-                >
-                  <Image
-                    src={shot.src}
-                    width={shot.width}
-                    height={shot.height}
-                    alt={shot.alt}
-                    loading="lazy"
-                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="h-auto max-w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-                  />
-                </ZoomableShot>
-                <figcaption className="border-t border-border px-4 py-2.5 text-sm font-medium text-fg">
-                  {shot.title}
-                </figcaption>
-              </figure>
-            ))}
+          <div className="mt-12">
+            <ShotCarousel shots={screenshots} />
           </div>
         </div>
       </section>

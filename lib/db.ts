@@ -59,6 +59,10 @@ export async function listUnarchived(sql: Sql): Promise<ReportRecord[]> {
   const rows = await sql`SELECT * FROM reports WHERE archived_at IS NULL ORDER BY created_at ASC` as Record<string, unknown>[]
   return rows.map(normalizeReport)
 }
+export async function countUnarchived(sql: Sql): Promise<number> {
+  const rows = await sql`SELECT count(*)::int AS n FROM reports WHERE archived_at IS NULL` as { n: number }[]
+  return rows[0].n
+}
 export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<void> {
   if (!ids.length) return
   await sql`UPDATE reports SET archived_at = now(), archive_ref = ${archiveRef},
