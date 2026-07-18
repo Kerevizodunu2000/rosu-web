@@ -6,7 +6,7 @@ export type ReportRecord = {
   title: string; description: string; contact: string | null
   app_version: string | null; os: string | null; lang: string | null; ip_hash: string | null
   image_status: 'none' | 'stored' | 'archived' | 'error'
-  image_drive_id: string | null; image_name: string | null; image_mime: string | null
+  image_drive_id: string | null; image_name: string | null; image_mime: string | null; image_original_name: string | null
   archive_ref: string | null; archived_at: string | null
 }
 export type Sql = ReturnType<typeof neon>
@@ -33,11 +33,11 @@ export async function insertReport(sql: Sql, r: {
 }
 
 export async function setReportImage(sql: Sql, id: number, v: {
-  image_status: string; image_drive_id?: string; image_name?: string; image_mime?: string
+  image_status: string; image_drive_id?: string; image_name?: string; image_mime?: string; image_original_name?: string
 }): Promise<void> {
   await sql`UPDATE reports SET image_status = ${v.image_status},
     image_drive_id = ${v.image_drive_id ?? null}, image_name = ${v.image_name ?? null},
-    image_mime = ${v.image_mime ?? null} WHERE id = ${id}`
+    image_mime = ${v.image_mime ?? null}, image_original_name = ${v.image_original_name ?? null} WHERE id = ${id}`
 }
 
 const iso = (v: unknown): string | null =>

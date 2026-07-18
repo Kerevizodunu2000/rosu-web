@@ -61,20 +61,30 @@ function ImageCell({
 }) {
   if (report.image_status === "stored") {
     return (
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label="View full-size screenshot"
-        className="block h-11 w-11 overflow-hidden rounded-lg border border-border transition-transform hover:scale-105"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- proxied admin-only image, not a static asset Next can optimize */}
-        <img
-          src={`/api/admin/image/${report.id}`}
-          alt="report screenshot"
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-      </button>
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label="View full-size screenshot"
+          className="block h-11 w-11 overflow-hidden rounded-lg border border-border transition-transform hover:scale-105"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- proxied admin-only image, not a static asset Next can optimize */}
+          <img
+            src={`/api/admin/image/${report.id}`}
+            alt="report screenshot"
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </button>
+        {report.image_original_name ? (
+          <span
+            title={report.image_original_name}
+            className="block max-w-[8rem] truncate font-mono text-[10px] text-fg-muted"
+          >
+            {report.image_original_name}
+          </span>
+        ) : null}
+      </div>
     );
   }
   if (report.image_status === "archived") {
@@ -247,8 +257,7 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
 
       {lightboxId !== null && (
         <Lightbox
-          src={`/api/admin/image/${lightboxId}`}
-          alt="Report screenshot"
+          images={[{ src: `/api/admin/image/${lightboxId}`, alt: "Report screenshot" }]}
           onClose={() => setLightboxId(null)}
         />
       )}

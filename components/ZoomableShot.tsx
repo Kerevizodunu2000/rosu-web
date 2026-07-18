@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Lightbox from "./Lightbox";
+import Lightbox, { type LightboxImage } from "./Lightbox";
 
 function IconZoom() {
   return (
@@ -15,23 +15,21 @@ function IconZoom() {
 }
 
 /**
- * Wraps a (server-rendered) image in a button that opens it full-size in the
- * shared <Lightbox>. Lets the landing page stay a server component — only this
- * thin wrapper is a client component. `src` is the full-resolution image to
- * show enlarged (the same public asset the thumbnail uses).
+ * Wraps a (server-rendered) image in a button that opens the shared <Lightbox>.
+ * Lets the landing page stay a server component — only this thin wrapper is a
+ * client component. Pass the whole `images` gallery and this image's `index` so
+ * the enlarged view can page left/right through the set.
  */
 export default function ZoomableShot({
-  src,
-  alt,
+  images,
+  index = 0,
   label,
-  caption,
   className = "",
   children,
 }: {
-  src: string;
-  alt: string;
+  images: LightboxImage[];
+  index?: number;
   label: string;
-  caption?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -53,9 +51,7 @@ export default function ZoomableShot({
           <IconZoom />
         </span>
       </button>
-      {open ? (
-        <Lightbox src={src} alt={alt} caption={caption} onClose={() => setOpen(false)} />
-      ) : null}
+      {open ? <Lightbox images={images} startIndex={index} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

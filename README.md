@@ -10,6 +10,10 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
 [![Deployed on Vercel](https://img.shields.io/badge/Deploy-Vercel-black.svg)](https://vercel.com)
 
+### 🌐 Live at **[rosu-web.vercel.app](https://rosu-web.vercel.app)**
+
+[Open the site](https://rosu-web.vercel.app) · [Report a problem](https://rosu-web.vercel.app/report) · [Privacy](https://rosu-web.vercel.app/privacy)
+
 </div>
 
 ---
@@ -112,6 +116,15 @@ scripts/        mint-drive-token.mjs (one-time Drive refresh-token helper)
 docs/           design spec + implementation plan
 reference/      the earlier (rejected) Google Apps Script approach, kept for context
 ```
+
+## Community
+
+- **Website** — <https://rosu-web.vercel.app>
+- **Instagram** — <https://www.instagram.com/rosu.app/>
+- **X** — <https://x.com/RosuApp>
+- **YouTube** — <https://www.youtube.com/@RosuApp>
+- **Reddit** — <https://www.reddit.com/user/RosuApp/>
+- **E-mail** — rosu.app@gmail.com
 
 ## License
 

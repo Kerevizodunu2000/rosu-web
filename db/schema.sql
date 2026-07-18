@@ -14,10 +14,13 @@ CREATE TABLE IF NOT EXISTS reports (
   image_drive_id text,
   image_name    text,
   image_mime    text,
+  image_original_name text,
   archive_ref   text,
   archived_at   timestamptz
 );
 CREATE INDEX IF NOT EXISTS reports_unarchived_idx ON reports (created_at DESC) WHERE archived_at IS NULL;
+-- Add the original uploaded filename to pre-existing tables (the CREATE TABLE above is a no-op once the table exists).
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS image_original_name text;
 
 CREATE TABLE IF NOT EXISTS rate_events (
   ip_hash    text NOT NULL,

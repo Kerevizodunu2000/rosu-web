@@ -7,7 +7,7 @@ export type ReportDeps = {
   verifyTurnstile: (token: string, secret: string, opts?: { remoteIp?: string }) => Promise<boolean>
   checkRateLimit: (ipHash: string) => Promise<{ allowed: boolean; reason?: string }>
   insertReport: (r: { source: string; title: string; description: string; contact: string; app_version: string; os: string; lang: string; ip_hash: string }) => Promise<{ id: number }>
-  setReportImage: (id: number, v: { image_status: string; image_drive_id?: string; image_name?: string; image_mime?: string }) => Promise<void>
+  setReportImage: (id: number, v: { image_status: string; image_drive_id?: string; image_name?: string; image_mime?: string; image_original_name?: string }) => Promise<void>
   uploadImage: (a: { name: string; mimeType: string; bytes: Uint8Array }) => Promise<string>
 }
 type Result = { status: number; body: { ok: boolean; id?: number; error?: string } }
@@ -52,7 +52,7 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
       } else {
         const name = safeImageName(v.image.mime, id)
         const driveId = await deps.uploadImage({ name, mimeType: v.image.mime, bytes })
-        await deps.setReportImage(id, { image_status: 'stored', image_drive_id: driveId, image_name: name, image_mime: v.image.mime })
+        await deps.setReportImage(id, { image_status: 'stored', image_drive_id: driveId, image_name: name, image_mime: v.image.mime, image_original_name: v.image.name })
       }
     } catch { await deps.setReportImage(id, { image_status: 'error' }) }
   }

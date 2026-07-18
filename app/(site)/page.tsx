@@ -132,6 +132,10 @@ const screenshots: {
   },
 ];
 
+// The three screenshots form one lightbox gallery, so the enlarged view can page
+// left/right between them.
+const galleryImages = screenshots.map((s) => ({ src: s.src, alt: s.alt, caption: s.title }));
+
 export default function Home() {
   return (
     <>
@@ -180,8 +184,7 @@ export default function Home() {
                 <span className="chip ml-3">Rosu — Dashboard</span>
               </div>
               <ZoomableShot
-                src="/screenshots/dashboard.png"
-                alt={DASHBOARD_ALT}
+                images={[{ src: "/screenshots/dashboard.png", alt: DASHBOARD_ALT, caption: "Dashboard" }]}
                 label="Enlarge the Rosu dashboard screenshot"
               >
                 <Image
@@ -241,7 +244,7 @@ export default function Home() {
           </div>
 
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {screenshots.map((shot) => (
+            {screenshots.map((shot, idx) => (
               <figure key={shot.title} className="card overflow-hidden">
                 <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
                   <span className="h-2.5 w-2.5 rounded-full bg-accent/40" />
@@ -250,8 +253,8 @@ export default function Home() {
                   <span className="chip ml-3">{shot.chip}</span>
                 </div>
                 <ZoomableShot
-                  src={shot.src}
-                  alt={shot.alt}
+                  images={galleryImages}
+                  index={idx}
                   label={`Enlarge the ${shot.title} screenshot`}
                 >
                   <Image

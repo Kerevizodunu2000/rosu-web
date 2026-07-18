@@ -22,11 +22,19 @@ security, and legal reviews.
   report form.
 - **Terms** (`/terms`) — short bilingual "as-is / no warranty / GPL / unofficial" notice
   with an abuse / IP contact.
-- **Click-to-zoom lightbox** on the landing screenshots (the hero dashboard and the
-  Packs/Search/Settings figures) — accessible (Escape + backdrop close, focus trap,
-  scroll lock), shared with the `/admin` image viewer.
-- **Social share metadata** (Open Graph + Twitter card) and a favicon.
-- **"Skip to content"** link for keyboard users.
+- **Click-to-zoom lightbox** for the landing screenshots (hero + Packs/Search/Settings):
+  the three screenshots page left/right (arrow buttons + keyboard arrows), the enlarged
+  image zooms with the mouse wheel and pans by dragging, with animated open + slide
+  transitions. Accessible (Escape/backdrop close, focus trap, scroll lock) and shared with
+  the `/admin` image viewer.
+- **Social links** in the footer (Instagram, X, YouTube, Reddit) and a prominent live-site
+  link in the README.
+- Footer contact e-mail now **copies to the clipboard** on click (in addition to opening a
+  mail client).
+- The **original uploaded image filename** is stored (`image_original_name`) and shown in
+  the admin table, alongside the server-side `rosu-<id>` name.
+- **Social share metadata** (Open Graph + Twitter card), a favicon, and a "Skip to content"
+  link for keyboard users.
 
 ### Changed
 - Report form: focus now moves to the confirmation/error after submitting; the Turnstile
@@ -38,6 +46,9 @@ security, and legal reviews.
   routes (route modules no longer cross-import or export non-handlers).
 
 ### Fixed
+- The screenshot lightbox no longer freezes the page when opened from the hero — it renders
+  through a portal, so the hero card's `transform` animation can't trap the fixed overlay
+  inside it (which had left the page scroll-locked).
 - The nightly archive no longer wedges when a single screenshot can't be downloaded from
   Drive — it archives the report text and continues.
 - Image size cap aligned with the request-body budget, so an at-cap screenshot degrades

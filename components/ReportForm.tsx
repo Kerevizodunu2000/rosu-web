@@ -190,6 +190,7 @@ export default function ReportForm() {
     if (screenshot) {
       payload.image_b64 = screenshot.b64;
       payload.image_mime = screenshot.mime;
+      payload.image_name = screenshot.name;
     }
 
     try {

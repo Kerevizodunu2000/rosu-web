@@ -15,7 +15,7 @@ export type ParsedReport = {
   title: string; description: string; contact: string
   appVersion: string; os: string; lang: string
   token: string; hp: string
-  image: { b64: string; mime: string } | null
+  image: { b64: string; mime: string; name: string } | null
 }
 
 const s = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -30,7 +30,7 @@ export function parseReport(raw: unknown):
   if (!title || !description) return { ok: false, error: 'missing_fields' }
   let image: ParsedReport['image'] = null
   const mime = s(d.image_mime)
-  if (s(d.image_b64) && ALLOWED_MIME[mime]) image = { b64: s(d.image_b64), mime }
+  if (s(d.image_b64) && ALLOWED_MIME[mime]) image = { b64: s(d.image_b64), mime, name: clip(d.image_name, 255) }
   return {
     ok: true,
     value: {
