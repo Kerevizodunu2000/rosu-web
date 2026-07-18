@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🌸 Report a problem (no GitHub account needed)
+    url: https://rosu-web.vercel.app/report
+    about: The site's own report form — a screenshot is welcome, no account required.
+  - name: 🖥️ Rosu desktop app issues
+    url: https://github.com/Kerevizodunu2000/rosu/issues
+    about: Bugs and ideas for the Windows app itself belong in the rosu repository.
+  - name: 🔒 Security issues
+    url: https://github.com/Kerevizodunu2000/rosu-web/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately — never in a public issue.

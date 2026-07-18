@@ -10,6 +10,11 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+### Added
+- Community health files: code of conduct (Contributor Covenant 2.1), contributing
+  guide, security policy, issue templates (bug/feature + contact links), and a pull
+  request template.
+
 ## [1.2.0] - 2026-07-18
 
 ### Added

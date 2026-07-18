@@ -1,0 +1,49 @@
+name: 🐛 Bug report (website)
+description: Something on rosu-web (the site or its API) is broken
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **If the bug is in the Rosu desktop app**, please use the
+        [rosu repository](https://github.com/Kerevizodunu2000/rosu/issues) instead.
+        Prefer not to use GitHub? The [report form](https://rosu-web.vercel.app/report) works too.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: The lightbox does not close when…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to https://rosu-web.vercel.app/…
+        2. Click …
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: Page / route
+      placeholder: e.g. /report, /admin, the landing page
+  - type: input
+    id: environment
+    attributes:
+      label: Browser & OS
+      placeholder: e.g. Chrome 138 on Windows 11, Safari on iOS 19
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
+      description: Drag & drop images here if helpful.

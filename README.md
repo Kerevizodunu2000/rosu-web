@@ -117,6 +117,12 @@ docs/           design spec + implementation plan
 reference/      the earlier (rejected) Google Apps Script approach, kept for context
 ```
 
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for setup and
+guidelines, and the [Code of Conduct](./CODE_OF_CONDUCT.md). Security issues go
+through [SECURITY.md](./SECURITY.md) (privately — never a public issue).
+
 ## Community
 
 - **Website** — <https://rosu-web.vercel.app>

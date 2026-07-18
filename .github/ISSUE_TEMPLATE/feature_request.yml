@@ -1,0 +1,31 @@
+name: ✨ Feature request
+description: Suggest an improvement to the rosu-web site or backend
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome! **Desktop-app features** belong in the
+        [rosu repository](https://github.com/Kerevizodunu2000/rosu/issues) instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      placeholder: As a visitor, it's hard to…
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Mockups, links, examples from other sites…
