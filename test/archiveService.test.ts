@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test, expect } from 'vitest'
+import type { ReportRecord } from '@/lib/db'
+const rec = (r: Partial<ReportRecord>) => r as ReportRecord
 import { runArchive, type ArchiveDeps } from '@/lib/archiveService'
 import JSZip from 'jszip'
 test('no unarchived → nothing', async () => {
@@ -11,8 +13,8 @@ test('bundles, uploads, marks, deletes', async () => {
   const deleted: string[] = []; let uploaded: Uint8Array | null = null; let marked: number[] = []
   const deps: ArchiveDeps = {
     listUnarchived: async () => [
-      { id: 1, title: 't', image_status: 'stored', image_drive_id: 'D1', image_name: 'rosu-1.png' } as any,
-      { id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null } as any,
+      rec({ id: 1, title: 't', image_status: 'stored', image_drive_id: 'D1', image_name: 'rosu-1.png' }),
+      rec({ id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null }),
     ],
     downloadImage: async () => new Uint8Array([1, 2, 3]),
     uploadArchive: async (name, bytes) => { uploaded = bytes; expect(name).toContain('20260717'); return 'AID' },
@@ -27,8 +29,8 @@ test('a failed image download does not wedge the archive', async () => {
   let marked: number[] = []; let uploaded: Uint8Array | null = null
   const deps: ArchiveDeps = {
     listUnarchived: async () => [
-      { id: 1, title: 't', image_status: 'stored', image_drive_id: 'GONE', image_name: 'rosu-1.png' } as any,
-      { id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null } as any,
+      rec({ id: 1, title: 't', image_status: 'stored', image_drive_id: 'GONE', image_name: 'rosu-1.png' }),
+      rec({ id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null }),
     ],
     downloadImage: async () => { throw new Error('image deleted in Drive') },
     uploadArchive: async (_name, bytes) => { uploaded = bytes; return 'AID' },

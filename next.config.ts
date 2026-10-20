@@ -15,7 +15,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // A status page's URL is its secret: never leak it in a Referer header.
+      { source: "/report/status/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    ];
   },
 };
 

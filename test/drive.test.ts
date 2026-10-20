@@ -4,7 +4,7 @@ import { DriveClient, type Transport } from '@/lib/drive'
 
 type CapturedRequest = { method: string; url: string; init?: { headers?: Record<string, string>; body?: BodyInit } }
 
-function fakeTransport(routes: Array<{ match: RegExp; status?: number; json?: any; bytes?: Uint8Array; headers?: Record<string,string> }>): { t: Transport; calls: string[]; requests: CapturedRequest[] } {
+function fakeTransport(routes: Array<{ match: RegExp; status?: number; json?: unknown; bytes?: Uint8Array; headers?: Record<string,string> }>): { t: Transport; calls: string[]; requests: CapturedRequest[] } {
   const calls: string[] = []
   const requests: CapturedRequest[] = []
   const t: Transport = async (method, url, init) => {

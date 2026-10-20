@@ -4,6 +4,7 @@ import Link from "next/link";
 import ReportForm from "@/components/ReportForm";
 import Disclosure from "@/components/Disclosure";
 import { PRIVACY_PATH } from "@/lib/links";
+import { ackConfig } from "@/lib/email";
 
 export const metadata: Metadata = {
   title: "Report a problem — Rosu",
@@ -25,7 +26,7 @@ export default function ReportPage() {
       </div>
 
       <div className="card mt-10 p-6 sm:p-8">
-        <ReportForm />
+        <ReportForm ackEmailAvailable={ackConfig() !== null} />
       </div>
 
       <Disclosure className="mt-6" />

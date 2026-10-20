@@ -77,7 +77,11 @@ export default function Lightbox({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Keep the latest onClose for the key/close handlers without re-binding them;
+  // updated after render (React forbids writing refs during render).
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const current = images[index];
 

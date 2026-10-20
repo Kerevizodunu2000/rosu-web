@@ -41,6 +41,13 @@ export default function Disclosure({ className = "" }: { className?: string }) {
           <IconDot />
           <span>Your browser&apos;s UI language, so we know whether to reply in English or Turkish.</span>
         </li>
+        <li className="flex gap-2">
+          <IconDot />
+          <span>
+            After sending you get a private link to follow the report&apos;s status. We e-mail it to you
+            only if you tick the confirmation box.
+          </span>
+        </li>
       </ul>
       <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-fg-muted">
         Your IP address is hashed and used only to prevent spam — we never store it in the clear.

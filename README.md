@@ -45,7 +45,9 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 
 - **Report text** → **Neon** (serverless Postgres). Used for rate-limiting, atomic ids, admin listing, and staged/archived status — *not* as bulk storage.
 - **Screenshots** → the owner's **Google Drive** (private, 15 GB), reusing the desktop app's existing OAuth client (scope `drive.file`).
-- A **daily Vercel Cron** (plus a manual "Archive now" button) bundles pending reports + images into a ZIP in Drive and empties the staging area — so no small-quota store ever fills.
+- A **daily Vercel Cron** (plus a manual "Archive now" button) bundles pending reports + images into a ZIP in Drive and empties the staging area — so no small-quota store ever fills. The same nightly job **enforces the 12-month retention** (old archive ZIPs, archived report rows, crash data and the admin log are deleted) and pings an optional **healthchecks.io** watchdog.
+- Every report gets a private **tracking link** (`/report/status/<token>`; only the token's hash is stored) showing received → in review → fixed in vX. Reporters can opt in to a one-off confirmation e-mail with that link (Resend).
+- The app migrates its own database schema on first use (idempotent DDL in `db/schema.mjs`), so a deploy can never run against missing columns.
 - The public endpoint is defended by a **honeypot**, **Cloudflare Turnstile** (web form), a **shared token** (desktop app), and **per-IP + global rate limits**. IPs are only ever stored as a salted hash.
 
 ## Tech stack
@@ -56,7 +58,7 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 | Database | **Neon** — serverless Postgres, no card, auto-resume |
 | Image / archive storage | **Google Drive** (`drive.file` scope, OAuth refresh token) |
 | Web-form captcha | **Cloudflare Turnstile** |
-| Admin session | signed JWT cookie (`jose`) |
+| Admin session | signed cookie (`jose`) carrying a server-side session id (Neon) — revocable, rotated, TOTP 2FA |
 | Archives | in-memory ZIP (`jszip`) |
 | Tests | **Vitest** |
 
@@ -64,14 +66,22 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 
 | Route | What |
 |---|---|
-| `/` | Landing page (screenshots open in an accessible lightbox) |
+| `/` | Landing page (screenshots open in an accessible lightbox; schema.org JSON-LD) |
+| `/changelog` | Every desktop release from GitHub Releases (rebuilt hourly) |
+| `/docs`, `/docs/api` | User guide · the public API contract the desktop app uses |
+| `/devlog` | Development notes (Markdown posts in `content/devlog/posts.ts`) |
+| `/status` | Live health of the site, report intake and update check |
 | `/report` | Report / contact form (Turnstile-protected) |
 | `/privacy` | Privacy Policy — bilingual (EN + TR) |
 | `/terms` | Terms — bilingual (EN + TR) |
-| `/admin` | Password-protected submissions viewer |
-| `POST /api/report` | Accepts the desktop app **and** the web form |
-| `GET /api/cron/archive` | Daily archive job (Vercel Cron) |
-| `POST /api/admin/{login,logout,archive}` | Admin session + manual archive |
+| `/report/status/<token>` | A reporter's private status page (no account) |
+| `/admin` | Submissions, status updates, crash groups, activity log (password + optional TOTP; can live under a secret `ADMIN_PATH`) |
+| `POST /api/report` | Accepts the desktop app **and** the web form; returns `{ ok, id, status_url }` |
+| `POST /api/crash` | Opt-in crash fingerprints from the desktop app (token + rate limit, scrubbed server-side) |
+| `GET /api/health` | `{ ok, db }` for uptime monitors (503 when the database is down) |
+| `GET /api/latest-version` | Latest desktop release (version, download + SHA-256 URLs, notes) for the in-app update check; CDN-cached |
+| `GET /api/cron/archive` | Nightly job: archive → 12-month retention → watchdog ping (Vercel Cron) |
+| `POST /api/admin/{login,logout,archive,status}` | Admin session, manual archive, report status |
 | `GET /api/admin/image/[id]` | Auth-gated Drive image proxy (never a public URL) |
 
 ## Local development
@@ -79,9 +89,10 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 ```bash
 npm install
 cp .env.example .env.local      # then fill in the values (see below)
-npm run migrate                 # create the Neon tables (needs DATABASE_URL)
+npm run migrate                 # optional: create/upgrade the Neon tables up front (the app also does it on first use)
 npm run dev                     # http://localhost:3000
-npm run test                    # Vitest
+npm run test                    # Vitest (unit)
+npm run build && npm run e2e    # Playwright smoke + axe accessibility checks (needs a Chromium: npx playwright install chromium)
 ```
 
 ### Environment variables
@@ -100,6 +111,19 @@ Set these in Vercel (Project → Settings → Environment Variables) and, for lo
 | `ADMIN_SESSION_SECRET` | Signs the admin session cookie |
 | `IP_HASH_SALT` | Salts hashed IPs |
 | `CRON_SECRET` | Protects the archive cron route |
+| `AUTO_ARCHIVE_THRESHOLD` | Archive right away once this many reports are pending (default 25, `0` = off) |
+| `ADMIN_PATH` | *Optional.* Secret admin path (12–64 chars `A-Z a-z 0-9 _ -`); `/admin` then answers 404 |
+| `ADMIN_TOTP_SECRET` | *Optional.* Requires an authenticator code at sign-in — generate with `node scripts/totp-setup.mjs` |
+| `RESEND_API_KEY` / `ACK_EMAIL_FROM` | *Optional.* Enable the opt-in confirmation e-mail (both required) |
+| `HEALTHCHECKS_PING_URL` | *Optional.* healthchecks.io ping for the nightly job (`/fail` on error) |
+| `GITHUB_TOKEN` | *Optional.* Higher GitHub API limit for `/api/latest-version` |
+
+### Admin security
+
+- Sign-in = password (constant-time) + optional TOTP code (each code works once). Failed attempts from one address trigger a progressive lockout (30 s, doubling, max 15 min) on top of the per-IP rate limit. Every sign-in and admin action lands in an audit log shown in the panel.
+- Sessions live server-side: a `__Host-` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`) carries only a random session id. Idle timeout 2 h, absolute 12 h, a fresh id every 15 min of use (each id rotates once); logout ends the whole sign-in and "sign out everywhere" revokes every session on the server.
+- With `ADMIN_PATH` set, admin routes answer only through the proxy (which stamps a gate header); a malformed value disables the panel rather than exposing `/admin`.
+- Limits and lockouts key on the IPv6 /64 (IPv4: the address).
 
 ## Privacy
 
@@ -110,9 +134,10 @@ A submission contains only what the user types (title, description, optional con
 ```
 app/            App Router — (site) group (landing + report), admin, api routes
 lib/            db, drive, validation, ratelimit, turnstile, session, zip, report/archive services
-components/      Nav, Footer, Brand, ReportForm, Disclosure, AdminTable
-db/             schema.sql + migrate script
-scripts/        mint-drive-token.mjs (one-time Drive refresh-token helper)
+components/     Nav, Footer, Brand, ReportForm, Disclosure, AdminTable, AdminPanels
+proxy.ts        secret admin path + session rotation
+db/             schema.mjs (idempotent DDL, shared by the app and `npm run migrate`) + migrate script
+scripts/        mint-drive-token.mjs (Drive refresh token) · totp-setup.mjs (admin 2FA secret)
 docs/           design spec + implementation plan
 reference/      the earlier (rejected) Google Apps Script approach, kept for context
 ```

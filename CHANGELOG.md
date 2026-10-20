@@ -10,7 +10,118 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-20
+
+Quality & visibility release.
+
+### Added
+- **`/changelog`** — every desktop release from GitHub Releases (notes, download, release
+  page), rebuilt at most hourly.
+- **`/docs`** (user guide) and **`/docs/api`** (the public contract of `/api/report`,
+  `/api/crash`, `/api/latest-version` and `/api/health`).
+- **`/devlog`** with a first post, *A zero-budget bug-report pipeline*. Posts are plain
+  Markdown in `content/devlog/posts.ts`, rendered by a small built-in Markdown subset
+  that never passes HTML through and only allows http(s)/relative links.
+- **`/status`** page and **`GET /api/health`** (`{ ok, db }`, 503 when the database is
+  down) for uptime monitors.
+- **SEO**: `sitemap.xml`, `robots.txt` (keeps `/admin`, `/api/` and status links out of
+  search), schema.org `SoftwareApplication` JSON-LD, and a generated **social card**
+  (`opengraph-image` / `twitter-image`) instead of a cropped screenshot.
+- **CI** (GitHub Actions): lint, unit tests, production build and a production-dependency
+  audit gate on every push/PR, plus a **Playwright** job running end-to-end smoke tests
+  and **axe** accessibility checks (WCAG 2 A/AA, serious+critical) on every public page,
+  the report form's failure path and the secret admin path.
+- **Dependabot** for npm (grouped minor/patch, weekly) and GitHub Actions (monthly).
+
 ### Changed
+- Accent-coloured text uses a deeper pink in light mode (5.7:1 on white, was ~3.4:1);
+  backgrounds and gradients keep the bright brand pink.
+- The navigation has one list of links (Features, Changelog, Docs, Report a problem)
+  rendered for both layouts; the footer links the devlog and status pages.
+- The footer year is read in the browser, so it no longer freezes at the build year.
+- Licence wording is "GPL-3.0-or-later" everywhere.
+
+### Fixed
+- Code blocks are keyboard-scrollable, and the screenshot-carousel dots are a plain
+  button group instead of an incomplete tab list (both flagged by axe).
+- The footer logo is no longer preloaded as if it were above the fold.
+- Lint is clean (the lightbox no longer writes a ref during render).
+
+### Removed
+- Unused `public/rosu-mark-outline.svg`, `public/rosu-splash.png` and the unused
+  gradients/symbol inside `rosu-mark.svg`.
+
+### Security
+- **Next.js 16.2.10 → 16.4.2**, which fixes a set of critical advisories in the version
+  in production (including a Proxy bypass, RCE in the Image Optimization API and in
+  `next/og`, cache poisoning and SSRF). Vulnerable transitive `nanoid`, `source-map-js`
+  and `baseline-browser-mapping` are pinned to fixed versions via `overrides`.
+
+## [1.3.0] - 2026-10-20
+
+Security & platform release.
+
+### Added
+- **Report status tracking** — every report now gets a private, unguessable tracking
+  link (`/report/status/<token>`, no account needed) showing *received → in review →
+  fixed in vX* plus an optional public note. Only a SHA-256 of the token is stored.
+  `POST /api/report` returns it as `status_url` (backward compatible for the desktop
+  app); the web form shows it with a copy button. The admin panel gains a per-report
+  status editor.
+- **Opt-in confirmation e-mail** (Resend) with the tracking link. Off unless
+  `RESEND_API_KEY` and `ACK_EMAIL_FROM` are both set; never echoes anything the
+  reporter typed; its own tight budget (one per recipient a day, 3/day per sender,
+  50/day overall).
+- **`GET /api/latest-version`** — the latest desktop release (version, release page,
+  `.exe` + `.sha256` download URLs, release-notes excerpt) from GitHub Releases,
+  CDN-cached and memoised per instance (a cache-busting query string cannot drive
+  GitHub calls), for the app's update check.
+- **`POST /api/crash`** — opt-in crash fingerprints from the desktop app. Token and
+  rate limit are checked before any parsing; the server clips and scrubs paths and
+  e-mail addresses, computes the fingerprint itself, keeps at most 500 distinct
+  crashes, and the admin panel groups identical crashes with a distinct-users count
+  (from a crash-only salted IP hash, disclosed in the policy).
+- **Admin two-factor sign-in** (TOTP, RFC 6238) via `ADMIN_TOTP_SECRET`; each code is
+  accepted once. `scripts/totp-setup.mjs` generates the secret.
+- **Secret admin path** (`ADMIN_PATH`): the panel moves to `/<slug>` and `/admin` +
+  `/api/admin/*` answer 404. Admin routes also require the proxy's gate header, so a
+  path the proxy does not see cannot reveal them; dot segments and double encoding
+  under the slug are refused; a malformed `ADMIN_PATH` disables the panel instead of
+  falling back to `/admin`.
+- **Progressive login lockout** (30 s, doubling, max 15 min per address) on top of the
+  per-IP rate limit. Failed attempts are counted in short-lived rate events; at most
+  60 failed sign-ins an hour are written to the audit log, so a flood cannot bury
+  real events.
+- **Admin audit log** (Neon) of sign-ins, lockouts, logouts, archive runs, status
+  changes and retention sweeps, shown in the panel with a security summary.
+- **Cron watchdog** — the nightly job pings `HEALTHCHECKS_PING_URL` on success and
+  `/fail` on error.
+
+### Changed
+- **12-month retention is now enforced**: the nightly job deletes archive ZIPs, archived
+  report rows, crash data and audit entries older than twelve months, as `/privacy`
+  promises. Each purge runs independently (a Drive outage no longer skips the
+  database purges), the two-day rate-event prune runs even when archiving fails, and
+  any failed step pings the watchdog's `/fail`. The policy (EN + TR) now also covers tracking links, confirmation e-mails
+  (Resend) and opt-in crash reports.
+- **Admin sessions are server-side**: the cookie (`__Host-`, `SameSite=Strict`) carries
+  a random session id stored in Neon — logout and "sign out everywhere" revoke it;
+  idle timeout 2 h, absolute 12 h, rotated every 15 minutes of use. An id is rotated
+  at most once (atomic claim), so a replayed or concurrent old cookie cannot fork the
+  session, and logout ends every session descended from that sign-in. A database
+  failure during "sign out everywhere" is reported instead of answered with "ok".
+  Existing sessions are signed out once by this upgrade.
+- Rate limits and lockouts key on the IPv6 /64 (IPv4: the address), so rotating
+  addresses inside one allocation no longer resets them.
+- Secrets are compared in constant time including their length.
+- Admin API calls check the request `Origin` (defence in depth against CSRF).
+- Rate-limit events carry a `kind`, so login, report, crash and e-mail budgets no
+  longer share one global counter (login spam could previously exhaust the global
+  report budget).
+- The schema lives in `db/schema.mjs` and the app applies it itself on first use
+  (idempotent, advisory-locked), so a deploy cannot run against missing columns;
+  `npm run migrate` uses the same statements.
+- The admin image proxy sends a sandboxing `Content-Security-Policy`.
 - The "A look inside" screenshots section now states which desktop release the
   screenshots were captured from (Rosu v1.3.3), with a version chip next to the
   heading.
@@ -127,7 +238,9 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...v1.1.0

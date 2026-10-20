@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
-import { getSql, listRecentUnarchived } from "@/lib/db";
+import { notFound } from "next/navigation";
+import { lookupAdmin } from "@/lib/adminGuard";
+import { adminApiBase, adminPageBase, adminSlug } from "@/lib/adminPath";
+import { listRecentUnarchived, listRecentAll, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
 import LoginForm from "./login-form";
 import AdminTable from "@/components/AdminTable";
+import { AuditPanel, CrashPanel, SecurityPanel } from "@/components/AdminPanels";
 
 export const metadata: Metadata = {
   title: "Admin — Rosu",
@@ -29,29 +31,47 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function AdminPage() {
-  // Reading cookies() makes this route dynamic — never statically cached.
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const authed = await verifySession(token, process.env.ADMIN_SESSION_SECRET!);
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const slug = adminSlug();
+  const apiBase = adminApiBase(slug);
+  const pageBase = adminPageBase(slug);
+  const totpEnabled = Boolean(process.env.ADMIN_TOTP_SECRET);
 
-  if (!authed) {
-    // No DB access on this path: the page must render with no DATABASE_URL
-    // and no session present (e.g. plain local dev).
+  // Reading cookies()/headers() (inside lookupAdmin) makes this route dynamic — never statically cached.
+  const admin = await lookupAdmin();
+  if (!admin.ok && admin.reason === "hidden") notFound();
+  if (!admin.ok) {
     return (
       <AdminChrome>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-20">
-          <LoginForm />
+          {admin.reason === "error" && (
+            <p className="field-error mb-4" role="alert">
+              The database is unreachable right now — sign-in may fail until it is back.
+            </p>
+          )}
+          <LoginForm apiBase={apiBase} totpRequired={totpEnabled} />
         </div>
       </AdminChrome>
     );
   }
 
-  const reports = await listRecentUnarchived(getSql(), 100);
+  const view = (await searchParams).view === "all" ? "all" : "unarchived";
+  const [reports, audit, crashes, liveSessions] = await Promise.all([
+    view === "all" ? listRecentAll(admin.sql, 100) : listRecentUnarchived(admin.sql, 100),
+    listAudit(admin.sql, 40),
+    listCrashGroups(admin.sql, 50),
+    countLiveAdminSessions(admin.sql),
+  ]);
 
   return (
     <AdminChrome>
-      <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
-        <AdminTable reports={reports} />
+      <div className="mx-auto flex max-w-6xl flex-col gap-12 px-5 py-8 sm:px-8">
+        <AdminTable reports={reports} apiBase={apiBase} view={view} pageBase={pageBase} />
+        <CrashPanel crashes={crashes} />
+        <div className="grid gap-12 lg:grid-cols-2">
+          <AuditPanel events={audit} />
+          <SecurityPanel totpEnabled={totpEnabled} secretPath={slug !== null} liveSessions={liveSessions} />
+        </div>
       </div>
     </AdminChrome>
   );

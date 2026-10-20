@@ -80,13 +80,13 @@ export class DriveClient {
     return JSON.parse(r.text()).id
   }
 
-  async listFolder(parent: string): Promise<{ id: string; name: string; size?: string }[]> {
-    const out: { id: string; name: string; size?: string }[] = []
+  async listFolder(parent: string): Promise<{ id: string; name: string; size?: string; createdTime?: string }[]> {
+    const out: { id: string; name: string; size?: string; createdTime?: string }[] = []
     let pageToken: string | undefined
     do {
       const q = new URLSearchParams({
         q: `'${qEscape(parent)}' in parents and trashed = false`,
-        fields: 'nextPageToken, files(id,name,size)', pageSize: '1000', spaces: 'drive',
+        fields: 'nextPageToken, files(id,name,size,createdTime)', pageSize: '1000', spaces: 'drive',
       })
       if (pageToken) q.set('pageToken', pageToken)
       const p = JSON.parse((await this.api('GET', `/files?${q}`)).text())

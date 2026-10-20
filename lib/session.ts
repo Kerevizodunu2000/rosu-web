@@ -1,15 +1,98 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Admin sessions: a signed cookie that only carries a random session id; the
+// session itself lives in Neon (admin_sessions), so logout and "sign out
+// everywhere" really end it server-side, and a stolen cookie dies with it.
 import { SignJWT, jwtVerify } from 'jose'
-export const SESSION_COOKIE = 'rosu_admin'
+import { randomBytes } from 'node:crypto'
+
+// `__Host-` binds the cookie to this exact origin: Secure, Path=/, no Domain.
+export const SESSION_COOKIE = '__Host-rosu_admin'
+/** Idle timeout: a session not refreshed (by a page load) within this ends. */
+export const SESSION_IDLE_SECONDS = 2 * 60 * 60
+/** Absolute cap counted from the password+TOTP sign-in, however active. */
+export const SESSION_MAX_SECONDS = 12 * 60 * 60
+/** A page load after this age swaps the session for a fresh id. */
+export const ROTATE_AFTER_SECONDS = 15 * 60
+/** How long a rotated-out id keeps working, for requests already in flight. */
+export const ROTATION_GRACE_SECONDS = 60
+
+export type SessionClaims = { sid: string; family: string; authTime: number; issuedAt: number; exp: number }
+
+export type SessionStore = {
+  insert: (v: { id: string; family: string; authTime: string; expiresAt: string }) => Promise<void>
+  /** Live = exists, not revoked, not expired. */
+  isLive: (id: string) => Promise<boolean>
+  /**
+   * Atomically mark ``id`` as rotated and cap its life at ``graceUntilIso``.
+   * True only for the single caller that wins: an id is rotated at most once,
+   * so a replayed or concurrent old cookie can never mint a second session.
+   */
+  claimRotation: (id: string, graceUntilIso: string) => Promise<boolean>
+}
+
 const key = (secret: string) => new TextEncoder().encode(secret)
-export async function createSession(secret: string, ttlSeconds = 60 * 60 * 12): Promise<string> {
-  return new SignJWT({ role: 'admin' })
+const sec = (ms: number) => Math.floor(ms / 1000)
+export const newSessionId = () => randomBytes(32).toString('base64url')
+
+async function sign(secret: string, c: { sid: string; family: string; authTime: number; exp: number }, nowS: number): Promise<string> {
+  return new SignJWT({ sid: c.sid, fam: c.family, at: c.authTime })
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(Math.floor(Date.now() / 1000) + ttlSeconds)
+    .setIssuedAt(nowS)
+    .setExpirationTime(c.exp)
     .sign(key(secret))
 }
-export async function verifySession(token: string | undefined, secret: string): Promise<boolean> {
-  if (!token) return false
-  try { await jwtVerify(token, key(secret)); return true } catch { return false }
+
+/** Verify the cookie's signature and expiry only (no database). */
+export async function readSessionToken(token: string | undefined, secret: string, nowMs = Date.now()): Promise<SessionClaims | null> {
+  if (!token || !secret) return null
+  try {
+    const { payload } = await jwtVerify(token, key(secret), { algorithms: ['HS256'], currentDate: new Date(nowMs) })
+    if (typeof payload.sid !== 'string' || typeof payload.fam !== 'string' || typeof payload.at !== 'number'
+        || typeof payload.iat !== 'number' || typeof payload.exp !== 'number') return null
+    return { sid: payload.sid, family: payload.fam, authTime: payload.at, issuedAt: payload.iat, exp: payload.exp }
+  } catch { return null }
+}
+
+/** Start a session (sign-in: new family) or continue one (rotation: same family + `authTime`). */
+export async function issueSession(store: SessionStore, secret: string,
+  opts: { nowMs?: number; authTime?: number; family?: string } = {}):
+  Promise<{ token: string; maxAge: number; sid: string; family: string }> {
+  const nowS = sec(opts.nowMs ?? Date.now())
+  const authTime = opts.authTime ?? nowS
+  const exp = Math.min(authTime + SESSION_MAX_SECONDS, nowS + SESSION_IDLE_SECONDS)
+  if (exp <= nowS) throw new Error('session past its absolute lifetime')
+  const sid = newSessionId()
+  const family = opts.family ?? sid
+  await store.insert({ id: sid, family, authTime: new Date(authTime * 1000).toISOString(), expiresAt: new Date(exp * 1000).toISOString() })
+  return { token: await sign(secret, { sid, family, authTime, exp }, nowS), maxAge: exp - nowS, sid, family }
+}
+
+/** Full check: valid signature AND a live server-side session. */
+export async function verifySession(store: SessionStore, token: string | undefined, secret: string, nowMs = Date.now()): Promise<SessionClaims | null> {
+  const claims = await readSessionToken(token, secret, nowMs)
+  if (!claims) return null
+  return (await store.isLive(claims.sid)) ? claims : null
+}
+
+/**
+ * If the session is old enough, issue a replacement (same family and sign-in
+ * time, so the absolute cap still holds) and let the old id lapse after a short
+ * grace window. The old id is claimed atomically first: only one caller ever
+ * rotates it, so neither two concurrent page loads nor a replayed old cookie
+ * can fork the session. Returns null when no rotation happens.
+ */
+export async function rotateIfDue(store: SessionStore, token: string | undefined, secret: string, nowMs = Date.now()):
+  Promise<{ token: string; maxAge: number; sid: string; family: string } | null> {
+  const claims = await verifySession(store, token, secret, nowMs)
+  if (!claims) return null
+  const nowS = sec(nowMs)
+  if (nowS - claims.issuedAt < ROTATE_AFTER_SECONDS) return null
+  if (claims.authTime + SESSION_MAX_SECONDS <= nowS) return null // past the cap: let it end
+  const grace = new Date((nowS + ROTATION_GRACE_SECONDS) * 1000).toISOString()
+  if (!(await store.claimRotation(claims.sid, grace))) return null
+  return issueSession(store, secret, { nowMs, authTime: claims.authTime, family: claims.family })
+}
+
+export function sessionCookieOptions(maxAge: number) {
+  return { httpOnly: true, secure: true, sameSite: 'strict' as const, path: '/', maxAge }
 }

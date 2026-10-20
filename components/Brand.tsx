@@ -7,10 +7,12 @@ type BrandProps = {
   markSize?: number;
   /** Render as a plain span instead of a link to "/" (e.g. inside a page that IS "/"). */
   as?: "link" | "span";
+  /** Preload the mark — only for the above-the-fold copy (the nav), not the footer. */
+  priority?: boolean;
 };
 
 /** The Rosu mark + wordmark lockup, reused in Nav and Footer. */
-export default function Brand({ className = "", markSize = 32, as = "link" }: BrandProps) {
+export default function Brand({ className = "", markSize = 32, as = "link", priority = false }: BrandProps) {
   const content = (
     <>
       <Image
@@ -18,7 +20,7 @@ export default function Brand({ className = "", markSize = 32, as = "link" }: Br
         alt=""
         width={markSize}
         height={markSize}
-        priority
+        priority={priority}
         className="shrink-0"
       />
       <span className="text-lg font-semibold tracking-tight text-fg">Rosu</span>

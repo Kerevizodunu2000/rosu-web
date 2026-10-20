@@ -1,17 +1,116 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test, expect } from 'vitest'
-import { createSession, verifySession } from '@/lib/session'
-test('round-trips a valid session', async () => {
-  const t = await createSession('secret-value-32-bytes-minimum-xxxx')
-  expect(await verifySession(t, 'secret-value-32-bytes-minimum-xxxx')).toBe(true)
+import {
+  issueSession, verifySession, readSessionToken, rotateIfDue, type SessionStore,
+  SESSION_IDLE_SECONDS, SESSION_MAX_SECONDS, ROTATE_AFTER_SECONDS, ROTATION_GRACE_SECONDS,
+} from '@/lib/session'
+
+const SECRET = 'secret-value-32-bytes-minimum-xxxx'
+
+function memStore(clock: { now: number }) {
+  const rows = new Map<string, { family: string; authTime: string; expiresAt: string; revoked: boolean; rotated: boolean }>()
+  const store: SessionStore = {
+    insert: async (v) => { rows.set(v.id, { family: v.family, authTime: v.authTime, expiresAt: v.expiresAt, revoked: false, rotated: false }) },
+    isLive: async (id) => {
+      const r = rows.get(id)
+      return !!r && !r.revoked && Date.parse(r.expiresAt) > clock.now
+    },
+    claimRotation: async (id, until) => {
+      const r = rows.get(id)
+      if (!r || r.rotated || r.revoked || Date.parse(r.expiresAt) <= clock.now) return false
+      r.rotated = true
+      if (Date.parse(until) < Date.parse(r.expiresAt)) r.expiresAt = until
+      return true
+    },
+  }
+  const revokeFamily = (family: string) => { for (const r of rows.values()) if (r.family === family) r.revoked = true }
+  return { store, rows, revokeFamily }
+}
+
+test('issued session verifies; wrong secret, garbage and missing do not', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store } = memStore(clock)
+  const s = await issueSession(store, SECRET, { nowMs: clock.now })
+  expect(s.maxAge).toBe(SESSION_IDLE_SECONDS)
+  expect(await verifySession(store, s.token, SECRET, clock.now)).not.toBeNull()
+  expect(await verifySession(store, s.token, 'different-secret-32-bytes-minimum!', clock.now)).toBeNull()
+  expect(await verifySession(store, undefined, SECRET, clock.now)).toBeNull()
+  expect(await verifySession(store, 'garbage', SECRET, clock.now)).toBeNull()
 })
-test('rejects wrong secret / missing / garbage', async () => {
-  const t = await createSession('secret-value-32-bytes-minimum-xxxx')
-  expect(await verifySession(t, 'different-secret-32-bytes-minimum!')).toBe(false)
-  expect(await verifySession(undefined, 'secret-value-32-bytes-minimum-xxxx')).toBe(false)
-  expect(await verifySession('garbage', 'secret-value-32-bytes-minimum-xxxx')).toBe(false)
+
+test('a revoked (logged-out) session is dead even with a valid signature', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store, rows } = memStore(clock)
+  const s = await issueSession(store, SECRET, { nowMs: clock.now })
+  rows.get(s.sid)!.revoked = true
+  expect(await readSessionToken(s.token, SECRET, clock.now)).not.toBeNull()
+  expect(await verifySession(store, s.token, SECRET, clock.now)).toBeNull()
 })
-test('rejects expired session', async () => {
-  const t = await createSession('secret-value-32-bytes-minimum-xxxx', -1)
-  expect(await verifySession(t, 'secret-value-32-bytes-minimum-xxxx')).toBe(false)
+
+test('idle timeout ends a session', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store } = memStore(clock)
+  const s = await issueSession(store, SECRET, { nowMs: clock.now })
+  clock.now += (SESSION_IDLE_SECONDS + 1) * 1000
+  expect(await verifySession(store, s.token, SECRET, clock.now)).toBeNull()
+})
+
+test('rotation: new id after ROTATE_AFTER, old id lapses after the grace window', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store } = memStore(clock)
+  const first = await issueSession(store, SECRET, { nowMs: clock.now })
+  expect(await rotateIfDue(store, first.token, SECRET, clock.now)).toBeNull() // too fresh
+  clock.now += (ROTATE_AFTER_SECONDS + 1) * 1000
+  const next = await rotateIfDue(store, first.token, SECRET, clock.now)
+  expect(next).not.toBeNull()
+  expect(next!.sid).not.toBe(first.sid)
+  // Old cookie still works for in-flight requests…
+  expect(await verifySession(store, first.token, SECRET, clock.now)).not.toBeNull()
+  clock.now += (ROTATION_GRACE_SECONDS + 1) * 1000
+  // …then dies, while the new one lives on with the original sign-in time.
+  expect(await verifySession(store, first.token, SECRET, clock.now)).toBeNull()
+  const claims = await verifySession(store, next!.token, SECRET, clock.now)
+  expect(claims?.authTime).toBe(Math.floor(Date.UTC(2026, 9, 20, 12) / 1000))
+})
+
+test('rotation never extends past the absolute 12 h cap', async () => {
+  const start = Date.UTC(2026, 9, 20, 0)
+  const clock = { now: start }
+  const { store } = memStore(clock)
+  let token = (await issueSession(store, SECRET, { nowMs: clock.now })).token
+  // Stay active: rotate every 16 minutes for 13 hours.
+  for (let i = 0; i < 49; i++) {
+    clock.now += 16 * 60 * 1000
+    const r = await rotateIfDue(store, token, SECRET, clock.now)
+    if (r) token = r.token
+  }
+  expect(clock.now - start).toBeGreaterThan(SESSION_MAX_SECONDS * 1000)
+  expect(await verifySession(store, token, SECRET, clock.now)).toBeNull()
+})
+
+test('a rotated id cannot be rotated again: no fork from a replayed or concurrent old cookie', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store, rows, revokeFamily } = memStore(clock)
+  const first = await issueSession(store, SECRET, { nowMs: clock.now })
+  clock.now += (ROTATE_AFTER_SECONDS + 1) * 1000
+  const a = await rotateIfDue(store, first.token, SECRET, clock.now)
+  const b = await rotateIfDue(store, first.token, SECRET, clock.now)   // replay / concurrent load
+  expect(a).not.toBeNull()
+  expect(b).toBeNull()
+  expect([...rows.values()].filter((r) => !r.revoked).length).toBe(2)   // old (in grace) + one new
+  // Logout ends the whole sign-in, the in-grace old id included.
+  revokeFamily(a!.family)
+  expect(await verifySession(store, first.token, SECRET, clock.now)).toBeNull()
+  expect(await verifySession(store, a!.token, SECRET, clock.now)).toBeNull()
+})
+
+test('the family is carried through rotations', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store } = memStore(clock)
+  const first = await issueSession(store, SECRET, { nowMs: clock.now })
+  expect(first.family).toBe(first.sid)
+  clock.now += (ROTATE_AFTER_SECONDS + 1) * 1000
+  const next = await rotateIfDue(store, first.token, SECRET, clock.now)
+  expect(next!.family).toBe(first.family)
+  expect((await readSessionToken(next!.token, SECRET, clock.now))?.family).toBe(first.family)
 })

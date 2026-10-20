@@ -9,6 +9,10 @@ const baseDeps = (over: Partial<ReportDeps> = {}): ReportDeps => ({
   insertReport: async () => ({ id: 7 }),
   setReportImage: async () => {},
   uploadImage: async () => 'DRIVEID',
+  newStatusToken: () => 'TOKEN',
+  statusUrl: (t) => `https://x.test/report/status/${t}`,
+  ackEmailEnabled: false,
+  allowAck: async () => true,
   ...over,
 })
 const web = { title: 't', description: 'd', hp: '' }
@@ -33,9 +37,9 @@ test('desktop path (Rosu UA) requires the shared token', async () => {
   const r = await handleReport({ raw: { ...web, token: 'WRONG' }, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3', deps: baseDeps() })
   expect(r.body).toEqual({ ok: false, error: 'unauthorized' })
 })
-test('desktop happy path returns id', async () => {
+test('desktop happy path returns id + status link', async () => {
   const r = await handleReport({ raw: desktop, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3', deps: baseDeps() })
-  expect(r.body).toEqual({ ok: true, id: 7 })
+  expect(r.body).toEqual({ ok: true, id: 7, status_url: 'https://x.test/report/status/TOKEN' })
 })
 test('rate limited → 429', async () => {
   const r = await handleReport({ raw: desktop, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3',
@@ -68,7 +72,30 @@ test('invalid image (bad magic bytes) → report saved, image_status error, uplo
       setReportImage: async (_id, v) => { imaged = v.image_status },
       uploadImage: async () => { uploadCalled = true; throw new Error('uploadImage should not be called') },
     }) })
-  expect(r.body).toEqual({ ok: true, id: 7 })
+  expect(r.body).toMatchObject({ ok: true, id: 7 })
   expect(imaged).toBe('error')
   expect(uploadCalled).toBe(false)
+})
+
+test('stores only the hash of the tracking token', async () => {
+  let stored = ''
+  await handleReport({ raw: desktop, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3',
+    deps: baseDeps({ insertReport: async (r) => { stored = r.status_token_hash; return { id: 7 } } }) })
+  expect(stored).toMatch(/^[0-9a-f]{64}$/)
+  expect(stored).not.toContain('TOKEN')
+})
+test('ack e-mail follow-up only when opted in, configured, valid and within budget', async () => {
+  const raw = { ...desktop, contact: 'me@example.com', ack_email: true }
+  const run = (over: Partial<ReportDeps>, r: Record<string, unknown> = raw) =>
+    handleReport({ raw: r, ip: '1.1.1.1', userAgent: 'Rosu/1.3.3', deps: baseDeps(over) })
+  expect((await run({ ackEmailEnabled: true })).followUp?.ackEmail)
+    .toEqual({ to: 'me@example.com', id: 7, statusUrl: 'https://x.test/report/status/TOKEN' })
+  expect((await run({ ackEmailEnabled: false })).followUp).toBeUndefined()
+  expect((await run({ ackEmailEnabled: true, allowAck: async () => false })).followUp).toBeUndefined()
+  expect((await run({ ackEmailEnabled: true }, { ...raw, ack_email: false })).followUp).toBeUndefined()
+  expect((await run({ ackEmailEnabled: true }, { ...raw, contact: 'not an email' })).followUp).toBeUndefined()
+})
+test('honeypot never gets a status link', async () => {
+  const r = await handleReport({ raw: { title: 't', description: 'd', hp: 'bot' }, ip: '1.1.1.1', userAgent: 'x', deps: baseDeps() })
+  expect(r.body).toEqual({ ok: true, id: 0 })
 })

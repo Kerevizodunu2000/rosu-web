@@ -4,7 +4,24 @@ import Image from "next/image";
 import Link from "next/link";
 import ZoomableShot from "@/components/ZoomableShot";
 import ShotCarousel, { type CarouselShot } from "@/components/ShotCarousel";
-import { DOWNLOAD_URL } from "@/lib/links";
+import { DOWNLOAD_URL, GITHUB_URL, SITE_URL } from "@/lib/links";
+
+// Structured data for search engines (schema.org SoftwareApplication).
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Rosu",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Windows",
+  description:
+    "Rosu unpacks osu! beatmap packs, dedupes them into one Library, flags missing packs, imports into osu!(stable) or osu!lazer and backs up to Google Drive.",
+  url: SITE_URL,
+  downloadUrl: DOWNLOAD_URL,
+  codeRepository: GITHUB_URL,
+  license: "https://www.gnu.org/licenses/gpl-3.0.html",
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
 
 const DASHBOARD_ALT =
   "Rosu dashboard showing 497 unpacked beatmaps in Output, with Unpack Archives, Import to osu!lazer or osu!(stable), and Back up to Drive actions above the beatmap list";
@@ -158,6 +175,11 @@ const screenshots: CarouselShot[] = [
 export default function Home() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        // Static data, and "<" is escaped so nothing in it can close the tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD).replace(/</g, "\\u003c") }}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-14 lg:py-28">
@@ -181,7 +203,7 @@ export default function Home() {
             </div>
 
             <p className="mt-5 font-mono text-xs uppercase tracking-wide text-fg-muted">
-              Free · Open-source (GPL-3.0) · Windows
+              Free · Open-source (GPL-3.0-or-later) · Windows
             </p>
           </div>
 

@@ -1,20 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { parseReport, imageMagicOk, safeImageName, LIMITS } from './validation'
+import { parseReport, imageMagicOk, safeImageName, isEmail, LIMITS } from './validation'
 import { hashIp, constantTimeEqual } from './crypto'
+import { hashStatusToken } from './reportStatus'
 
 export type ReportDeps = {
   salt: string; appToken: string; turnstileSecret: string
   verifyTurnstile: (token: string, secret: string, opts?: { remoteIp?: string }) => Promise<boolean>
   checkRateLimit: (ipHash: string) => Promise<{ allowed: boolean; reason?: string }>
-  insertReport: (r: { source: string; title: string; description: string; contact: string; app_version: string; os: string; lang: string; ip_hash: string }) => Promise<{ id: number }>
+  insertReport: (r: { source: string; title: string; description: string; contact: string; app_version: string; os: string; lang: string; ip_hash: string; status_token_hash: string }) => Promise<{ id: number }>
   setReportImage: (id: number, v: { image_status: string; image_drive_id?: string; image_name?: string; image_mime?: string; image_original_name?: string }) => Promise<void>
   uploadImage: (a: { name: string; mimeType: string; bytes: Uint8Array }) => Promise<string>
+  /** Fresh random tracking token for the reporter's status link. */
+  newStatusToken: () => string
+  statusUrl: (token: string) => string
+  /** Whether confirmation e-mails are configured (RESEND_API_KEY + ACK_EMAIL_FROM). */
+  ackEmailEnabled: boolean
+  /** Separate, tight budget for confirmation e-mails (they go to an unverified address). */
+  allowAck: (ipHash: string, recipient: string) => Promise<boolean>
 }
-type Result = { status: number; body: { ok: boolean; id?: number; error?: string } }
-const ok = (id: number): Result => ({ status: 200, body: { ok: true, id } })
+/** Work the route performs after responding (kept out of the request's critical path). */
+export type FollowUp = { ackEmail?: { to: string; id: number; statusUrl: string } }
+type Result = { status: number; body: { ok: boolean; id?: number; error?: string; status_url?: string }; followUp?: FollowUp }
+const ok = (id: number, status_url?: string): Result => ({ status: 200, body: status_url ? { ok: true, id, status_url } : { ok: true, id } })
 const fail = (status: number, error: string): Result => ({ status, body: { ok: false, error } })
 
-export async function handleReport(a: { raw: unknown; ip: string; userAgent: string; deps: ReportDeps }): Promise<Result> {
+export async function handleReport(a: { raw: unknown; ip: string; rateKey?: string; userAgent: string; deps: ReportDeps }): Promise<Result> {
   const { deps } = a
   const parsed = parseReport(a.raw)
   if (!parsed.ok) return parsed.error === 'missing_fields' ? fail(400, 'missing_fields') : fail(400, parsed.error)
@@ -35,14 +45,18 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
     return fail(200, 'captcha') // browser without a solved captcha
   }
 
-  const ipHash = hashIp(a.ip, deps.salt)
+  // rateKey = the address as a rate-limit identity (an IPv6 /64), see lib/net.ts.
+  const ipHash = hashIp(a.rateKey ?? a.ip, deps.salt)
   const rl = await deps.checkRateLimit(ipHash)
   if (!rl.allowed) return fail(429, rl.reason ?? 'rate_limited')
 
+  const statusToken = deps.newStatusToken()
   const { id } = await deps.insertReport({
     source, title: v.title, description: v.description, contact: v.contact,
     app_version: v.appVersion, os: v.os, lang: v.lang, ip_hash: ipHash,
+    status_token_hash: hashStatusToken(statusToken),
   })
+  const status_url = deps.statusUrl(statusToken)
 
   if (v.image) {
     try {
@@ -56,5 +70,9 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
       }
     } catch { await deps.setReportImage(id, { image_status: 'error' }) }
   }
-  return ok(id)
+  const result = ok(id, status_url)
+  if (v.ackEmail && deps.ackEmailEnabled && isEmail(v.contact) && await deps.allowAck(ipHash, v.contact)) {
+    result.followUp = { ackEmail: { to: v.contact, id, statusUrl: status_url } }
+  }
+  return result
 }

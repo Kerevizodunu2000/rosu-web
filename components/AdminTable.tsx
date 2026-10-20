@@ -3,8 +3,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ReportRecord } from "@/lib/db";
+import type { ReportRecord, ReportStatus } from "@/lib/db";
 import Lightbox from "@/components/Lightbox";
+import { STATUS_LABELS, NOTE_MAX } from "@/lib/reportStatus";
 
 type ArchiveResponse = { ok?: boolean; archived?: number; archiveName?: string };
 
@@ -55,9 +56,11 @@ function DescriptionCell({
 function ImageCell({
   report,
   onOpen,
+  apiBase,
 }: {
   report: ReportRecord;
   onOpen: () => void;
+  apiBase: string;
 }) {
   if (report.image_status === "stored") {
     return (
@@ -70,7 +73,7 @@ function ImageCell({
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- proxied admin-only image, not a static asset Next can optimize */}
           <img
-            src={`/api/admin/image/${report.id}`}
+            src={`${apiBase}/image/${report.id}`}
             alt="report screenshot"
             loading="lazy"
             className="h-full w-full object-cover"
@@ -96,7 +99,95 @@ function ImageCell({
   return <span className="text-sm text-fg-muted">—</span>;
 }
 
-export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
+const STATUS_OPTIONS: ReportStatus[] = ["received", "in_review", "fixed", "closed"];
+
+// Public status shown on the reporter's tracking page. Edits stay local until
+// "Save", so a half-typed version number never reaches the reporter.
+function StatusCell({ report, apiBase }: { report: ReportRecord; apiBase: string }) {
+  const router = useRouter();
+  const [status, setStatus] = useState<ReportStatus>(report.status);
+  const [fixedIn, setFixedIn] = useState(report.fixed_in ?? "");
+  const [note, setNote] = useState(report.status_note ?? "");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const dirty =
+    status !== report.status || (fixedIn || "") !== (report.fixed_in ?? "") || (note || "") !== (report.status_note ?? "");
+
+  async function save() {
+    setState("saving");
+    try {
+      const res = await fetch(`${apiBase}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: report.id, status, fixed_in: fixedIn, status_note: note }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+      if (res.ok && data?.ok) {
+        setState("saved");
+        router.refresh();
+      } else setState("error");
+    } catch {
+      setState("error");
+    }
+  }
+
+  return (
+    <div className="flex w-48 flex-col gap-1.5">
+      <label className="sr-only" htmlFor={`status-${report.id}`}>Status of report {report.id}</label>
+      <select
+        id={`status-${report.id}`}
+        value={status}
+        onChange={(e) => { setStatus(e.target.value as ReportStatus); setState("idle"); }}
+        className="field-input py-1 text-xs"
+      >
+        {STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+        ))}
+      </select>
+      {status === "fixed" && (
+        <input
+          value={fixedIn}
+          onChange={(e) => { setFixedIn(e.target.value); setState("idle"); }}
+          placeholder="Fixed in (e.g. 1.8.0)"
+          aria-label="Fixed in version"
+          className="field-input py-1 font-mono text-xs"
+        />
+      )}
+      <textarea
+        value={note}
+        onChange={(e) => { setNote(e.target.value); setState("idle"); }}
+        maxLength={NOTE_MAX}
+        rows={2}
+        placeholder="Public note (optional)"
+        aria-label="Public note shown to the reporter"
+        className="field-textarea py-1 text-xs"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty || state === "saving"}
+          className="btn btn-secondary px-2.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-xs text-fg-muted">Saved</span>}
+        {state === "error" && <span className="text-xs text-accent-rose">Failed</span>}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminTable({
+  reports,
+  apiBase,
+  view,
+  pageBase,
+}: {
+  reports: ReportRecord[];
+  apiBase: string;
+  view: "unarchived" | "all";
+  pageBase: string;
+}) {
   const router = useRouter();
   const [busyArchive, setBusyArchive] = useState(false);
   const [busyLogout, setBusyLogout] = useState(false);
@@ -125,7 +216,7 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
     setBusyArchive(true);
     setArchiveMessage(null);
     try {
-      const res = await fetch("/api/admin/archive", { method: "POST" });
+      const res = await fetch(`${apiBase}/archive`, { method: "POST" });
       const data = (await res.json().catch(() => null)) as ArchiveResponse | null;
       if (res.ok && data?.ok) {
         setArchiveMessage(
@@ -144,16 +235,31 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
     }
   }
 
-  async function handleLogout() {
+  async function handleLogout(all = false) {
     if (busyLogout) return;
+    if (all && !window.confirm("Sign out every admin session, including this one?")) return;
     setBusyLogout(true);
+    let ok = false;
     try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } finally {
-      // Cookie is gone server-side; refreshing re-renders the (server) page,
-      // which now falls through to the login view.
-      router.refresh();
+      const res = await fetch(`${apiBase}/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
     }
+    if (!ok) {
+      setBusyLogout(false);
+      setArchiveMessage(all
+        ? "Could not sign out everywhere — the server did not confirm it, so assume nothing was revoked."
+        : "Could not sign out — please try again.");
+      return;
+    }
+    // The session is gone server-side; refreshing re-renders the (server) page,
+    // which now falls through to the login view.
+    router.refresh();
   }
 
   return (
@@ -162,14 +268,34 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-fg">Submissions</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {reports.length} unarchived report{reports.length === 1 ? "" : "s"}
+            {view === "all"
+              ? `${reports.length} most recent report${reports.length === 1 ? "" : "s"} (archived included)`
+              : `${reports.length} unarchived report${reports.length === 1 ? "" : "s"}`}
           </p>
+          <nav aria-label="Report view" className="mt-2 flex gap-3 text-xs">
+            <a href={pageBase} aria-current={view === "unarchived" ? "page" : undefined}
+              className={view === "unarchived" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
+              Unarchived
+            </a>
+            <a href={`${pageBase}?view=all`} aria-current={view === "all" ? "page" : undefined}
+              className={view === "all" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
+              All recent
+            </a>
+          </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {archiveMessage && <span className="max-w-xs text-xs text-fg-muted">{archiveMessage}</span>}
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => handleLogout(true)}
+            disabled={busyLogout}
+            className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Sign out everywhere
+          </button>
+          <button
+            type="button"
+            onClick={() => handleLogout(false)}
             disabled={busyLogout}
             className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -189,12 +315,12 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
 
       {reports.length === 0 ? (
         <div className="card flex flex-col items-center gap-1.5 px-6 py-16 text-center">
-          <p className="text-sm font-medium text-fg">No reports right now.</p>
+          <p className="text-sm font-medium text-fg">{view === "all" ? "No reports yet." : "No reports right now."}</p>
           <p className="text-sm text-fg-muted">New submissions will show up here as they arrive.</p>
         </div>
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[880px] border-collapse text-sm">
+          <table className="w-full min-w-[1080px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-fg-muted">
                 <th className="py-3 pl-4 pr-3 font-medium">Time</th>
@@ -202,7 +328,8 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
                 <th className="px-3 py-3 font-medium">Report</th>
                 <th className="px-3 py-3 font-medium">Contact</th>
                 <th className="px-3 py-3 font-medium">Diagnostics</th>
-                <th className="py-3 pl-3 pr-4 font-medium">Image</th>
+                <th className="px-3 py-3 font-medium">Image</th>
+                <th className="py-3 pl-3 pr-4 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -244,8 +371,11 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
                       <div>{r.os || "—"}</div>
                       <div>{r.lang || "—"}</div>
                     </td>
+                    <td className="px-3 py-3">
+                      <ImageCell report={r} apiBase={apiBase} onOpen={() => setLightboxId(r.id)} />
+                    </td>
                     <td className="py-3 pl-3 pr-4">
-                      <ImageCell report={r} onOpen={() => setLightboxId(r.id)} />
+                      <StatusCell report={r} apiBase={apiBase} />
                     </td>
                   </tr>
                 );
@@ -257,7 +387,7 @@ export default function AdminTable({ reports }: { reports: ReportRecord[] }) {
 
       {lightboxId !== null && (
         <Lightbox
-          images={[{ src: `/api/admin/image/${lightboxId}`, alt: "Report screenshot" }]}
+          images={[{ src: `${apiBase}/image/${lightboxId}`, alt: "Report screenshot" }]}
           onClose={() => setLightboxId(null)}
         />
       )}

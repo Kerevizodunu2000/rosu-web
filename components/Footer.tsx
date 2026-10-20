@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import Brand from "./Brand";
 import CopyEmail from "./CopyEmail";
+import CurrentYear from "./CurrentYear";
 import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_PATH, TERMS_PATH, SOCIAL } from "@/lib/links";
 
 function GithubIcon() {
@@ -65,7 +66,7 @@ export default function Footer() {
           <div className="max-w-sm">
             <Brand markSize={28} />
             <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-              Rosu is free, open-source (GPL-3.0), donation-only and non-commercial.
+              Rosu is free, open-source (GPL-3.0-or-later), donation-only and non-commercial.
               Unofficial, fan-made — not affiliated with or endorsed by ppy Pty Ltd or osu!.
             </p>
           </div>
@@ -83,6 +84,18 @@ export default function Footer() {
                 className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
               >
                 Terms
+              </Link>
+              <Link
+                href="/devlog"
+                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
+              >
+                Devlog
+              </Link>
+              <Link
+                href="/status"
+                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
+              >
+                Status
               </Link>
               <CopyEmail className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4" />
               <a
@@ -110,7 +123,7 @@ export default function Footer() {
         </div>
 
         <p className="mt-10 font-mono text-xs uppercase tracking-wide text-fg-muted">
-          © {new Date().getFullYear()} Rosu · GPL-3.0-or-later
+          © <CurrentYear /> Rosu · GPL-3.0-or-later
         </p>
       </div>
     </footer>

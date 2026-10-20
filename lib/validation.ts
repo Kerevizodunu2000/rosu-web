@@ -16,7 +16,13 @@ export type ParsedReport = {
   appVersion: string; os: string; lang: string
   token: string; hp: string
   image: { b64: string; mime: string; name: string } | null
+  /** Reporter opted in to a confirmation e-mail (only honoured with a valid contact address). */
+  ackEmail: boolean
 }
+
+// Deliberately plain: one @, no spaces/angle brackets/quotes/commas, a dot in the domain.
+const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
+export const isEmail = (v: string) => v.length <= LIMITS.contact && EMAIL_RE.test(v)
 
 const s = (v: unknown) => (typeof v === 'string' ? v : '')
 const clip = (v: unknown, n: number) => s(v).slice(0, n)
@@ -38,6 +44,7 @@ export function parseReport(raw: unknown):
       contact: s(d.contact).trim().slice(0, LIMITS.contact),
       appVersion: clip(d.app_version, 40), os: clip(d.os, 120), lang: clip(d.lang, 10),
       token: s(d.token), hp: s(d.hp), image,
+      ackEmail: d.ack_email === true,
     },
   }
 }

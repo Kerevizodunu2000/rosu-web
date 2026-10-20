@@ -108,7 +108,7 @@ export default function ShotCarousel({ shots }: { shots: CarouselShot[] }) {
       </div>
 
       {count > VISIBLE && (
-        <div className="mt-6 flex items-center justify-center gap-2" role="tablist" aria-label="Screenshot pages">
+        <div className="mt-6 flex items-center justify-center gap-2" role="group" aria-label="Screenshot pages">
           {shots.map((s, i) => (
             <button
               key={s.src}
