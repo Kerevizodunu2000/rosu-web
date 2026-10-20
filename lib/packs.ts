@@ -14,6 +14,11 @@ export const SERIES_LABEL: Record<Standard, string> = {
 export const packUrl = (code: string) => `https://osu.ppy.sh/beatmaps/packs/${encodeURIComponent(code)}`
 
 const SUFFIXES = ['.tar.gz', '.tar.bz2', '.tar.xz', '.tgz', '.tbz2', '.txz', '.zip', '.7z', '.tar', '.rar']
+// A download still in progress is not a pack you have.
+const PARTIAL = /\.(crdownload|part|partial|download|tmp|opdownload)$/i
+/** No real pack number comes near this; a date or timestamp in a name would. */
+export const MAX_PACK_NUMBER = 99_999
+const NAME_MAX = 300
 const PACK_RE = /^([A-Za-z]+)(\d+)\s*-\s*(.+?)(?:\s+\((\d+)\))?$/
 // A pack code on its own, as some downloaders name the files ("S1234.zip").
 const CODE_ONLY_RE = /^([A-Za-z]{1,3})(\d{1,6})$/
@@ -21,7 +26,8 @@ const CODE_ONLY_RE = /^([A-Za-z]{1,3})(\d{1,6})$/
 export type Parsed = { series: string; number: number; code: string } | null
 
 export function parsePackName(fileName: string): Parsed {
-  let stem = fileName.split(/[\\/]/).pop()?.trim() ?? ''
+  let stem = (fileName.split(/[\\/]/).pop() ?? '').trim().slice(0, NAME_MAX)
+  if (PARTIAL.test(stem)) return null
   const low = stem.toLowerCase()
   const suf = SUFFIXES.find((s) => low.endsWith(s))
   if (suf) stem = stem.slice(0, -suf.length).trim()
@@ -29,7 +35,7 @@ export function parsePackName(fileName: string): Parsed {
   if (!m) return null
   const series = m[1].toUpperCase()
   const number = Number(m[2])
-  if (!Number.isSafeInteger(number) || number <= 0) return null
+  if (!Number.isSafeInteger(number) || number <= 0 || number > MAX_PACK_NUMBER) return null
   return { series, number, code: `${series}${number}` }
 }
 
@@ -39,6 +45,7 @@ export type PackReport = {
   other: { series: string; owned: number }[]
   unrecognised: number               // names that are not packs at all
   total: number                      // distinct packs recognised
+  truncated: boolean                 // more than MAX_NAMES names: only the first were read
 }
 
 export const MAX_NAMES = 20_000
@@ -70,7 +77,7 @@ export function packReport(names: string[]): PackReport {
   standard.sort((a, b) => STANDARD.indexOf(a.series as Standard) - STANDARD.indexOf(b.series as Standard))
   other.sort((a, b) => a.series.localeCompare(b.series))
   const total = [...bySeries.values()].reduce((s, v) => s + v.size, 0)
-  return { standard, other, unrecognised, total }
+  return { standard, other, unrecognised, total, truncated: names.length > MAX_NAMES }
 }
 
 /** "S12, S15–S18": runs of missing numbers, for a compact copyable list. */

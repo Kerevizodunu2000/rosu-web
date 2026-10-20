@@ -216,6 +216,22 @@ export async function reportStats(sql: Sql, byStatus?: Record<ReportStatus, numb
   }
 }
 
+// ── job locks (v1.6) ──────────────────────────────────────────────────────────
+
+/** Take the lease on ``name`` for ``ttlSeconds`` if nobody holds a live one. */
+export async function acquireJobLock(sql: Sql, name: string, holder: string, ttlSeconds: number): Promise<boolean> {
+  const rows = await sql`INSERT INTO job_locks (name, holder, until)
+    VALUES (${name}, ${holder}, now() + ${ttlSeconds}::int * interval '1 second')
+    ON CONFLICT (name) DO UPDATE SET holder = EXCLUDED.holder, until = EXCLUDED.until
+      WHERE job_locks.until < now()
+    RETURNING holder` as { holder: string }[]
+  return rows.length > 0
+}
+/** Give the lease back (only if it is still ours). */
+export async function releaseJobLock(sql: Sql, name: string, holder: string): Promise<void> {
+  await sql`DELETE FROM job_locks WHERE name = ${name} AND holder = ${holder}`
+}
+
 // ── rate limiting ─────────────────────────────────────────────────────────────
 
 export type RateKind = 'report' | 'login' | 'login_fail' | 'crash' | 'ack' | 'ack_to'

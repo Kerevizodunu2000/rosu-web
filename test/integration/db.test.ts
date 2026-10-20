@@ -45,3 +45,16 @@ maybe('admin search, bulk status and delete (v1.5)', async () => {
   expect(await db.deleteReportRow(sql, b.id, null)).toBe(true)
   expect((await db.searchReports(sql, { ...base, pattern: `%${marker}%` })).total).toBe(0)
 })
+
+maybe('job locks are leases that run out (v1.6)', async () => {
+  const name = `test-lock-${Date.now()}`
+  expect(await db.acquireJobLock(sql, name, 'a', 60)).toBe(true)
+  expect(await db.acquireJobLock(sql, name, 'b', 60)).toBe(false)
+  await db.releaseJobLock(sql, name, 'b')                  // not b's to release
+  expect(await db.acquireJobLock(sql, name, 'b', 60)).toBe(false)
+  await db.releaseJobLock(sql, name, 'a')
+  expect(await db.acquireJobLock(sql, name, 'b', 0)).toBe(true)
+  await new Promise((r) => setTimeout(r, 20))
+  expect(await db.acquireJobLock(sql, name, 'c', 60)).toBe(true)   // b's lease ran out
+  await db.releaseJobLock(sql, name, 'c')
+})

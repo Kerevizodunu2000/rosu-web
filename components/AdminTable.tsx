@@ -184,8 +184,11 @@ const DELETE_ERRORS: Record<string, string> = {
   not_found: "Already deleted — refresh the list.",
   busy: "The nightly archive was running — try again in a minute.",
   drive: "Google Drive did not answer — nothing was deleted from the database; try again.",
-  archive_unreadable: "Its Drive archive could not be read — nothing was deleted; check the archive by hand.",
+  archive_unreadable: "Its Drive archive could not be read — the report and its archive entry are still there (its screenshot may already be gone); check the archive by hand.",
   bad_request: "The request was refused — reload the page and try again.",
+  unauthorized: "Your session ended — sign in again, then retry.",
+  forbidden: "Your session ended — sign in again, then retry.",
+  unavailable: "The server is busy right now — try again in a minute.",
   server: "Something went wrong on the server — try again; the activity log has the details.",
   network: "No connection to the server — try again.",
 };
@@ -210,7 +213,11 @@ function DeleteButton({ report, apiBase }: { report: ReportRecord; apiBase: stri
       });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (res.ok) router.refresh();
-      else setError(DELETE_ERRORS[data?.error ?? ""] ?? DELETE_ERRORS.server);
+      else {
+        const byStatus = res.status === 401 ? "unauthorized" : res.status === 403 ? "forbidden"
+          : res.status === 503 ? "unavailable" : "server";
+        setError(DELETE_ERRORS[data?.error ?? ""] ?? DELETE_ERRORS[byStatus]);
+      }
     } catch {
       setError(DELETE_ERRORS.network);
     }
@@ -218,7 +225,7 @@ function DeleteButton({ report, apiBase }: { report: ReportRecord; apiBase: stri
   return (
     <div className="flex flex-col gap-1">
       <button type="button" onClick={run} disabled={state === "busy"}
-        aria-label={`Delete report ${report.id} everywhere`}
+        aria-label={`Delete everywhere, report ${report.id}`}
         className="self-start text-xs font-medium text-accent-rose hover:underline disabled:opacity-50">
         {state === "busy" ? "Deleting…" : "Delete everywhere"}
       </button>

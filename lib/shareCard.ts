@@ -5,6 +5,7 @@
 
 export type CardStats = {
   sets: number
+  capped: boolean                 // more than MAX_SETS: only the first were counted
   modes: { mode: string; sets: number }[]
   topArtists: { artist: string; sets: number }[]
   starMax: number | null
@@ -13,15 +14,16 @@ export type CardStats = {
 }
 
 const MODES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania']
-const MAX_SETS = 200_000
+export const MAX_SETS = 200_000
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 /** Stats from the export, or an error code when it is not a Rosu export. */
 export function cardStats(json: unknown): CardStats | { error: 'not_export' | 'empty' } {
-  const sets = (json && typeof json === 'object' && Array.isArray((json as { sets?: unknown }).sets))
-    ? ((json as { sets: unknown[] }).sets).slice(0, MAX_SETS) : null
-  if (!sets) return { error: 'not_export' }
+  const all = (json && typeof json === 'object' && Array.isArray((json as { sets?: unknown }).sets))
+    ? (json as { sets: unknown[] }).sets : null
+  if (!all) return { error: 'not_export' }
+  const sets = all.slice(0, MAX_SETS).filter((s) => s !== null && typeof s === 'object' && !Array.isArray(s))
   if (!sets.length) return { error: 'empty' }
   const modeCount = new Map<string, number>()
   const artistCount = new Map<string, number>()
@@ -29,7 +31,6 @@ export function cardStats(json: unknown): CardStats | { error: 'not_export' | 'e
   let starMax: number | null = null
   let seconds = 0
   for (const s of sets) {
-    if (!s || typeof s !== 'object') continue
     const r = s as Record<string, unknown>
     const modes = Array.isArray(r.modes) ? r.modes.filter((m): m is string => typeof m === 'string') : []
     for (const m of new Set(modes)) if (MODES.includes(m)) modeCount.set(m, (modeCount.get(m) ?? 0) + 1)
@@ -44,6 +45,7 @@ export function cardStats(json: unknown): CardStats | { error: 'not_export' | 'e
   }
   return {
     sets: sets.length,
+    capped: all.length > MAX_SETS,
     modes: MODES.filter((m) => modeCount.has(m)).map((m) => ({ mode: m, sets: modeCount.get(m)! })),
     topArtists: [...artistCount].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5)
       .map(([artist, n]) => ({ artist, sets: n })),

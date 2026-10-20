@@ -2,7 +2,7 @@
 import { test, expect } from 'vitest'
 import JSZip from 'jszip'
 import { buildReportsZip, removeReportFromZip } from '@/lib/zip'
-import { deleteReportEverywhere, parseDsarRequest, type DsarDeps } from '@/lib/dsar'
+import { archivesFor, deleteReportEverywhere, parseDsarRequest, type DsarDeps } from '@/lib/dsar'
 import type { ReportRecord } from '@/lib/db'
 
 const report = (id: number, over: Partial<ReportRecord> = {}): ReportRecord => ({
@@ -44,7 +44,7 @@ function fakeDeps(r: ReportRecord | null | (() => ReportRecord | null), archives
       if (fail === id) throw new Error(`Drive DELETE /files/${id} -> 500: boom`)
       if (fail === `404:${id}`) throw new Error(`Drive DELETE /files/${id} -> 404: gone`)
     },
-    findArchives: async (name) => Object.keys(archives).filter((k) => k.endsWith(name)).map((k) => ({ id: k, name })),
+    listArchives: async () => Object.keys(archives).map((k) => ({ id: k, name: k.slice(k.indexOf(':') + 1) })),
     downloadFile: async (id) => {
       if (!(id in archives)) throw new Error(`Drive GET /files/${id}?alt=media -> 404: gone`)
       return archives[id]
@@ -96,6 +96,7 @@ test('a screenshot id that is still set is deleted whatever the image status say
 test('the nightly archive taking the report mid-way: that archive is cleaned before the row goes', async () => {
   const archives: Record<string, Uint8Array> = { 'old:rosu-reports-20261020.zip': await archiveWith(11, 12) }
   let reads = 0
+  // Seen before the archive day: the archive is not in range yet on the first pass.
   const t = fakeDeps(() => (++reads === 1 ? report(11)
     : report(11, { archive_ref: 'rosu-reports-20261020.zip', image_name: 'report-11.png' })), archives)
   let rowCalls = 0
@@ -104,10 +105,39 @@ test('the nightly archive taking the report mid-way: that archive is cleaned bef
     t.calls.push(`row ${id} ${ref}`)
     return ref !== null      // the first try saw archive_ref null; the row has one now
   }
-  expect(await deleteReportEverywhere(t.deps, 11)).toEqual({ ok: true, imageDeleted: false, archivesChanged: 1 })
+  const NOW = Date.UTC(2026, 9, 15)
+  expect(await deleteReportEverywhere(t.deps, 11, NOW)).toEqual({ ok: true, imageDeleted: false, archivesChanged: 1 })
   expect(rowCalls).toBe(2)
   expect(t.calls).toEqual(['row 11 null', 'up rosu-reports-20261020.zip', 'del old:rosu-reports-20261020.zip',
     'row 11 rosu-reports-20261020.zip'])
+})
+
+test('a copy left in an earlier archive by a run that died is cleaned too', async () => {
+  const archives: Record<string, Uint8Array> = {
+    'a:rosu-reports-20261002.zip': await archiveWith(30),          // the run that died before marking
+    'b:rosu-reports-20261003.zip': await archiveWith(30, 31),      // the run that marked it
+    'c:rosu-reports-20260901.zip': await archiveWith(29),          // older than the report: never read
+  }
+  const t = fakeDeps(report(30, { created_at: '2026-10-02T10:00:00.000Z', archive_ref: 'rosu-reports-20261003.zip' }), archives)
+  const read: string[] = []
+  const download = t.deps.downloadFile
+  t.deps.downloadFile = async (id) => { read.push(id); return download(id) }
+  expect(await deleteReportEverywhere(t.deps, 30, Date.UTC(2026, 9, 20))).toMatchObject({ ok: true, archivesChanged: 2 })
+  expect(read.sort()).toEqual(['a:rosu-reports-20261002.zip', 'b:rosu-reports-20261003.zip'])
+  expect(t.calls).toContain('del a:rosu-reports-20261002.zip')   // it held only this report
+})
+
+test('archivesFor: named archive plus the dated ones between creation and it (or today)', () => {
+  const files = ['rosu-reports-20261001.zip', 'rosu-reports-20261002.zip', 'rosu-reports-20261005.zip',
+    'rosu-reports-20261009.zip', 'notes.zip'].map((name, i) => ({ id: String(i), name }))
+  const names = (r: { created_at: string; archive_ref: string | null }, now = Date.UTC(2026, 9, 6)) =>
+    archivesFor(r, files, now).map((f) => f.name)
+  expect(names({ created_at: '2026-10-02T23:00:00Z', archive_ref: 'rosu-reports-20261005.zip' }))
+    .toEqual(['rosu-reports-20261002.zip', 'rosu-reports-20261005.zip'])
+  expect(names({ created_at: '2026-10-02T23:00:00Z', archive_ref: null }))
+    .toEqual(['rosu-reports-20261002.zip', 'rosu-reports-20261005.zip'])
+  expect(names({ created_at: '2026-10-02T23:00:00Z', archive_ref: 'notes.zip' }))
+    .toEqual(['rosu-reports-20261002.zip', 'rosu-reports-20261005.zip', 'notes.zip'])
 })
 
 test('a row that keeps changing is reported as busy, and a row deleted meanwhile counts as done', async () => {
@@ -122,7 +152,7 @@ test('a row that keeps changing is reported as busy, and a row deleted meanwhile
 
 test('an archive already gone is skipped; an unreadable one stops the deletion', async () => {
   const t = fakeDeps(report(15, { archive_ref: 'x.zip' }), {})
-  t.deps.findArchives = async (name) => [{ id: 'missing', name }]
+  t.deps.listArchives = async () => [{ id: 'missing', name: 'x.zip' }]
   expect(await deleteReportEverywhere(t.deps, 15)).toMatchObject({ ok: true, archivesChanged: 0 })
   const broken = fakeDeps(report(16, { archive_ref: 'y.zip' }), { 'b:y.zip': new TextEncoder().encode('not a zip') })
   expect(await deleteReportEverywhere(broken.deps, 16)).toEqual({ ok: false, error: 'archive_unreadable' })

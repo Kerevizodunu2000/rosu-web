@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { compactRanges, packReport, packUrl, SERIES_LABEL, type PackReport, type Standard } from "@/lib/packs";
+import { compactRanges, MAX_NAMES, packReport, packUrl, SERIES_LABEL, type PackReport, type Standard } from "@/lib/packs";
 
 const SHOW_LINKS = 60;   // per series; the copyable list carries the rest
 
@@ -34,7 +34,7 @@ export default function MissingPacks() {
         <p className="max-w-md text-sm text-fg-muted">
           Only their names are read, in your browser — nothing is uploaded.
         </p>
-        <label className="btn btn-secondary cursor-pointer">
+        <label className="btn btn-secondary file-trigger relative cursor-pointer">
           Choose files…
           <input type="file" multiple className="sr-only" onChange={(e) => fromFiles(e.target.files)} />
         </label>
@@ -50,12 +50,13 @@ export default function MissingPacks() {
         </button>
       </details>
 
+      {/* Always mounted, so screen readers announce the summary when it changes. */}
+      <p role="status" className="text-sm text-fg-muted empty:hidden">
+        {report && `${report.total} packs recognised${report.unrecognised ? ` · ${report.unrecognised} other files ignored` : ""}.`}
+        {report?.truncated && ` Only the first ${MAX_NAMES.toLocaleString("en")} names were read.`}
+      </p>
       {report && (
-        <section aria-live="polite" className="flex flex-col gap-5">
-          <p className="text-sm text-fg-muted">
-            {report.total} packs recognised
-            {report.unrecognised ? ` · ${report.unrecognised} other files ignored` : ""}.
-          </p>
+        <section className="flex flex-col gap-5">
           {report.standard.length === 0 && (
             <p className="card px-5 py-4 text-sm text-fg">
               No standard packs (S, SM, ST, SC) found — those are the series a gap can be proven for.

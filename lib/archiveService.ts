@@ -11,6 +11,16 @@ export type ArchiveDeps = {
   markArchived: (ids: number[], archiveName: string) => Promise<number[]>
   deleteImage: (driveId: string) => Promise<void>
 }
+/** The rewrite that takes vanished reports out of a new archive failed: the
+ *  file named here may still hold their data and needs a look. */
+export class ArchiveRewriteError extends Error {
+  constructor(readonly archiveName: string, readonly fileId: string, readonly reports: number) {
+    super(`archive ${archiveName} (${fileId}) still holds ${reports} deleted report(s)`)
+  }
+}
+
+const REWRITE_TRIES = 3
+
 export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ archived: number; archiveName?: string }> {
   const reports = await deps.listUnarchived()
   if (!reports.length) return { archived: 0 }
@@ -52,8 +62,20 @@ export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ ar
     // while this ZIP was built: it must not keep a copy of them.
     // (A new file, then the old one deleted: an updated file would keep the
     // old content as a Drive revision.)
-    if (ours.length) await deps.uploadArchive(archiveName, await buildReportsZip(ours))
-    await deps.deleteArchive(fileId)
+    let replacement: string | null = null
+    let lastError: unknown = null
+    for (let i = 0; i < REWRITE_TRIES; i++) {
+      try {
+        if (ours.length && replacement === null) replacement = await deps.uploadArchive(archiveName, await buildReportsZip(ours))
+        await deps.deleteArchive(fileId)
+        lastError = null
+        break
+      } catch (e) {
+        if (/-> 404\b/.test(String(e instanceof Error ? e.message : e))) { lastError = null; break }
+        lastError = e
+      }
+    }
+    if (lastError !== null) throw new ArchiveRewriteError(archiveName, fileId, entries.length - ours.length)
   }
   return ours.length ? { archived: ours.length, archiveName } : { archived: 0 }
 }

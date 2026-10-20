@@ -27,6 +27,27 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
   accessibility checks.
 
 ### Fixed
+Found by the v1.6 code and security review (before release):
+- **Two deletion requests at once could leave one report in a rebuilt archive.** Every job
+  that rewrites the Drive archives — the nightly archive, the retention sweep and "Delete
+  everywhere" — now takes turns through a lease in the database (`job_locks`, schema 4;
+  a lease a killed function never gives back simply runs out). A deletion that cannot get
+  its turn within a few seconds says the archive is busy and changes nothing.
+- A deletion also checks every archive dated between the report's creation and the archive
+  it names, so a copy left by a run that died before marking its reports is found too.
+- When the archive job cannot take reports deleted mid-run back out of its new ZIP (after
+  three tries), the activity log names the file to fix by hand.
+- Missing pack checker: a date or timestamp in a file name (`S20240101 - …`) no longer
+  counts as a pack (it froze the tab building a 20-million-entry gap list); downloads still
+  in progress (`.crdownload`, `.part`) do not count as owned; very long pasted lines are
+  cut; a list past 20,000 names says so; the result summary is announced to screen readers;
+  "Choose files…" shows a keyboard focus ring.
+- Share card: names and artists can no longer run off the card or into another column; only
+  real set records are counted, and a library past 200,000 sets says so; an older, slower
+  file load can no longer replace a newer one; the card's content is also available as text.
+- Admin: the delete button's accessible name starts with its visible text; an expired
+  session or a busy server get their own message.
+
 Found by the v1.5 code and security review:
 - **Delete everywhere** now also deletes a screenshot whose status says "archived" while its
   Drive file id is still set.

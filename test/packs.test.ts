@@ -21,6 +21,23 @@ test('interior gaps of standard series only; other series are listed', () => {
   expect(r.other).toEqual([{ series: 'R', owned: 2 }])          // never guessed red
   expect(r.unrecognised).toBe(1)
   expect(r.total).toBe(7)
+  expect(r.truncated).toBe(false)
+})
+
+test('dates, timestamps and unfinished downloads are not packs', () => {
+  expect(parsePackName('S20240101 - holiday photos.zip')).toBeNull()      // would be a 20M-number gap
+  expect(parsePackName('S99999 - x.zip')?.number).toBe(99999)
+  expect(parsePackName('S12 - Beatmap Pack #12.zip.crdownload')).toBeNull()
+  expect(parsePackName('S12 - Beatmap Pack #12.zip.part')).toBeNull()
+  const r = packReport(['S1 - a.zip', 'S900000000 - x.zip'])
+  expect(r.standard[0].missing).toEqual([])
+  expect(r.unrecognised).toBe(1)
+})
+
+test('a very long pasted line is cut before it is parsed', () => {
+  const t0 = Date.now()
+  expect(parsePackName('S1 - a' + ' '.repeat(80_000) + '!')).not.toBeUndefined()
+  expect(Date.now() - t0).toBeLessThan(500)
 })
 
 test('copyable ranges and pack links', () => {

@@ -87,3 +87,23 @@ test('an archive nobody claims is deleted, and an unmarked upload is taken back'
     .rejects.toThrow('db down')
   expect(deletedArchives).toEqual(['A1', 'A1'])         // the next run archives it again, once
 })
+
+test('a rewrite that keeps failing is reported with the archive to fix by hand', async () => {
+  const { ArchiveRewriteError } = await import('@/lib/archiveService')
+  let deletes = 0
+  const deps: ArchiveDeps = {
+    listUnarchived: async () => [
+      rec({ id: 1, title: 't', image_status: 'none', image_drive_id: null, image_name: null }),
+      rec({ id: 2, title: 'u', image_status: 'none', image_drive_id: null, image_name: null }),
+    ],
+    downloadImage: async () => new Uint8Array(),
+    uploadArchive: async () => 'A1',
+    deleteArchive: async () => { deletes++; throw new Error('Drive DELETE /files/A1 -> 500: boom') },
+    markArchived: async () => [2],
+    deleteImage: async () => {},
+  }
+  const err = await runArchive(deps, '20261020').catch((e) => e)
+  expect(err).toBeInstanceOf(ArchiveRewriteError)
+  expect(err.archiveName).toBe('rosu-reports-20261020.zip')
+  expect(deletes).toBe(3)                                  // tried three times
+})

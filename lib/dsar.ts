@@ -5,17 +5,20 @@
 // row in place to retry; every step tolerates "already gone", so a retry after
 // a partial run finishes the job instead of failing on it.
 //
-// The nightly archive may take the report while this runs. The row is only
-// deleted while its archive_ref is still the one that was cleaned; if it
-// changed, the new archive is cleaned too. (The archive job covers the other
-// order: a report deleted after it was zipped is taken out of that ZIP again.)
+// Every job that rewrites the Drive archives holds one lock (lib/lock.ts), so
+// this never races the nightly archive or another deletion. As a second line,
+// the row is only deleted while its archive_ref is still the one that was
+// cleaned, and every archive dated between the report's creation and its
+// archive_ref is checked — a run that died before marking its reports could
+// have left a copy in an archive the row does not name.
 import { removeReportFromZip, UnreadableArchiveError } from './zip'
 import type { ReportRecord } from './db'
 
 export type DsarDeps = {
   getReport: (id: number) => Promise<ReportRecord | null>
   deleteDriveFile: (fileId: string) => Promise<void>
-  findArchives: (name: string) => Promise<{ id: string; name: string }[]>
+  /** Every file in the archives folder. */
+  listArchives: () => Promise<{ id: string; name: string }[]>
   downloadFile: (fileId: string) => Promise<Uint8Array>
   /** Upload a rewritten archive under the same name (retention goes by the name's date). */
   uploadArchive: (name: string, bytes: Uint8Array) => Promise<string>
@@ -30,8 +33,29 @@ export type DsarResult =
 
 const ATTEMPTS = 3
 const gone = (e: unknown) => /-> 404\b/.test(String(e instanceof Error ? e.message : e))
+const ARCHIVE_DAY = /^rosu-reports-(\d{8})\.zip$/
 
-export async function deleteReportEverywhere(deps: DsarDeps, id: number): Promise<DsarResult> {
+/** ``YYYYMMDD`` (UTC) of an ISO time, or of an archive's name. */
+const dayOf = (iso: string) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+/** The archives that may hold report ``r``: the one it names, and every one
+ *  dated from the day it was created to that one (or today, if none). */
+export function archivesFor(r: Pick<ReportRecord, 'created_at' | 'archive_ref'>,
+  files: { id: string; name: string }[], nowMs: number): { id: string; name: string }[] {
+  const from = dayOf(r.created_at)
+  const named = r.archive_ref ? ARCHIVE_DAY.exec(r.archive_ref)?.[1] : undefined
+  const to = named ?? dayOf(new Date(nowMs).toISOString())
+  return files.filter((f) => {
+    if (r.archive_ref && f.name === r.archive_ref) return true
+    const day = ARCHIVE_DAY.exec(f.name)?.[1]
+    return day !== undefined && from !== '' && day >= from && day <= to
+  })
+}
+
+export async function deleteReportEverywhere(deps: DsarDeps, id: number, nowMs = Date.now()): Promise<DsarResult> {
   let imageDeleted = false
   let archivesChanged = 0
   const cleanedImages = new Set<string>()
@@ -49,8 +73,8 @@ export async function deleteReportEverywhere(deps: DsarDeps, id: number): Promis
         catch (e) { if (!gone(e)) throw e }
         cleanedImages.add(r.image_drive_id)
       }
-      if (r.archive_ref) {
-        for (const a of await deps.findArchives(r.archive_ref)) {
+      {
+        for (const a of archivesFor(r, await deps.listArchives(), nowMs)) {
           if (cleanedArchives.has(a.id)) continue
           let bytes: Uint8Array
           try { bytes = await deps.downloadFile(a.id) }

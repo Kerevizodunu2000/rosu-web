@@ -24,7 +24,8 @@ function draw(canvas: HTMLCanvasElement, s: CardStats, name: string) {
 
   ctx.fillStyle = "#ecebf5";
   ctx.font = `600 34px ${font}`;
-  ctx.fillText(name ? `${name}'s osu! library` : "My osu! library", 72, 104);
+  const inner = W - 2 * 72;
+  ctx.fillText(name ? `${name}'s osu! library` : "My osu! library", 72, 104, inner);
   ctx.font = `700 120px ${font}`;
   ctx.fillStyle = "#ff66aa";
   ctx.fillText(new Intl.NumberFormat("en").format(s.sets), 72, 240);
@@ -40,16 +41,17 @@ function draw(canvas: HTMLCanvasElement, s: CardStats, name: string) {
     s.starMax !== null ? `hardest ${s.starMax}★` : "",
     s.mania.length ? `mania: ${s.mania.map((k) => `${k.keys}K`).join(" · ")}` : "",
   ].filter(Boolean);
-  ctx.fillText(facts.join("   ·   "), 72, 300);
+  ctx.fillText(facts.join("   ·   "), 72, 300, inner);
 
   ctx.font = `600 26px ${font}`;
   ctx.fillStyle = "#ecebf5";
   ctx.fillText("Most sets by", 72, 380);
   ctx.font = `400 26px ${font}`;
   ctx.fillStyle = "#a6a5c0";
-  s.topArtists.slice(0, 5).forEach((a, i) => {
+  // Four rows keep clear of the footer; each stays left of the Modes column.
+  s.topArtists.slice(0, 4).forEach((a, i) => {
     const label = a.artist.length > 34 ? a.artist.slice(0, 33) + "…" : a.artist;
-    ctx.fillText(`${label} — ${a.sets}`, 72, 420 + i * 36);
+    ctx.fillText(`${label} — ${a.sets}`, 72, 420 + i * 36, 600);
   });
 
   let x = 700;
@@ -58,7 +60,7 @@ function draw(canvas: HTMLCanvasElement, s: CardStats, name: string) {
   ctx.fillText("Modes", x, 380);
   ctx.font = `400 26px ${font}`;
   ctx.fillStyle = "#a6a5c0";
-  s.modes.forEach((m, i) => ctx.fillText(`${m.mode} — ${m.sets}`, x, 420 + i * 36));
+  s.modes.forEach((m, i) => ctx.fillText(`${m.mode} — ${m.sets}`, x, 420 + i * 36, W - x - 72));
 
   ctx.font = `500 22px ${font}`;
   ctx.fillStyle = "#a6a5c0";
@@ -71,24 +73,30 @@ export default function ShareCard() {
   const [stats, setStats] = useState<CardStats | null>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const latest = useRef(0);   // a slower, older load must not overwrite a newer one
 
   useEffect(() => {
     if (stats && canvas.current) draw(canvas.current, stats, name.trim());
   }, [stats, name]);
 
   async function load(file: File | undefined) {
+    const ticket = ++latest.current;
     setError(null);
+    setStats(null);
     if (!file) return;
     if (file.size > MAX_BYTES) { setError("That file is too big to be a Rosu export."); return; }
+    setBusy(true);
     try {
       const res = cardStats(JSON.parse(await file.text()));
+      if (ticket !== latest.current) return;
       if ("error" in res) {
         setError(res.error === "empty" ? "That export lists no sets." : "That isn't a Rosu JSON export (Search → Export… → JSON).");
-        setStats(null);
       } else setStats(res);
     } catch {
-      setError("That file isn't valid JSON.");
-      setStats(null);
+      if (ticket === latest.current) setError("That file isn't valid JSON.");
+    } finally {
+      if (ticket === latest.current) setBusy(false);
     }
   }
 
@@ -121,7 +129,20 @@ export default function ShareCard() {
           Download PNG
         </button>
       </div>
+      {busy && <p className="text-sm text-fg-muted" role="status">Reading the export…</p>}
       {error && <p className="field-error" role="alert">{error}</p>}
+      {stats?.capped && (
+        <p className="text-sm text-fg-muted">Only the first {stats.sets.toLocaleString("en")} sets were counted.</p>
+      )}
+      {stats && (
+        // The card as text, for screen readers.
+        <div className="sr-only">
+          <p>{stats.sets} beatmap sets{stats.hours ? `, ${stats.hours} hours of music` : ""}
+            {stats.starMax !== null ? `, hardest ${stats.starMax} stars` : ""}.</p>
+          {stats.topArtists.length > 0 && <p>Most sets by: {stats.topArtists.map((a) => `${a.artist} (${a.sets})`).join(", ")}.</p>}
+          {stats.modes.length > 0 && <p>Modes: {stats.modes.map((m) => `${m.mode} (${m.sets})`).join(", ")}.</p>}
+        </div>
+      )}
       <canvas ref={canvas} width={W} height={H} role="img"
         aria-label={stats ? `Library card: ${stats.sets} beatmap sets` : "Library card preview"}
         className={`h-auto w-full rounded-xl border border-border ${stats ? "" : "hidden"}`} />

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test, expect } from 'vitest'
-import { cardStats } from '@/lib/shareCard'
+import { cardStats, MAX_SETS } from '@/lib/shareCard'
 
 test('stats from a Rosu JSON export', () => {
   const s = cardStats({ query: '', count: 3, sets: [
@@ -10,7 +10,8 @@ test('stats from a Rosu JSON export', () => {
     'junk', null,
   ] })
   expect(s).toEqual({
-    sets: 5,
+    sets: 3,                         // only real set records count
+    capped: false,
     modes: [{ mode: 'osu!', sets: 2 }, { mode: 'osu!mania', sets: 2 }],
     topArtists: [{ artist: 'Camellia', sets: 2 }, { artist: 'xi', sets: 1 }],
     starMax: 6.81,
@@ -23,4 +24,10 @@ test('anything else is refused', () => {
   expect(cardStats({ hello: 1 })).toEqual({ error: 'not_export' })
   expect(cardStats(null)).toEqual({ error: 'not_export' })
   expect(cardStats({ sets: [] })).toEqual({ error: 'empty' })
+  expect(cardStats({ sets: ['junk', null, [1]] })).toEqual({ error: 'empty' })
+})
+
+test('a library past the cap says so', () => {
+  const s = cardStats({ sets: Array.from({ length: MAX_SETS + 1 }, () => ({ artist: 'a' })) })
+  expect('error' in s ? null : [s.sets, s.capped]).toEqual([MAX_SETS, true])
 })
