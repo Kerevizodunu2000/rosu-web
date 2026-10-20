@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import type { Metadata } from "next";
-import { currentAdmin } from "@/lib/adminGuard";
+import { notFound } from "next/navigation";
+import { lookupAdmin } from "@/lib/adminGuard";
 import { adminApiBase, adminPageBase, adminSlug } from "@/lib/adminPath";
 import { listRecentUnarchived, listRecentAll, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
 import LoginForm from "./login-form";
@@ -36,12 +37,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pageBase = adminPageBase(slug);
   const totpEnabled = Boolean(process.env.ADMIN_TOTP_SECRET);
 
-  // Reading cookies() (inside currentAdmin) makes this route dynamic — never statically cached.
-  const admin = await currentAdmin();
-  if (!admin) {
+  // Reading cookies()/headers() (inside lookupAdmin) makes this route dynamic — never statically cached.
+  const admin = await lookupAdmin();
+  if (!admin.ok && admin.reason === "hidden") notFound();
+  if (!admin.ok) {
     return (
       <AdminChrome>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-20">
+          {admin.reason === "error" && (
+            <p className="field-error mb-4" role="alert">
+              The database is unreachable right now — sign-in may fail until it is back.
+            </p>
+          )}
           <LoginForm apiBase={apiBase} totpRequired={totpEnabled} />
         </div>
       </AdminChrome>

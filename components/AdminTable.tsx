@@ -239,17 +239,27 @@ export default function AdminTable({
     if (busyLogout) return;
     if (all && !window.confirm("Sign out every admin session, including this one?")) return;
     setBusyLogout(true);
+    let ok = false;
     try {
-      await fetch(`${apiBase}/logout`, {
+      const res = await fetch(`${apiBase}/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all }),
       });
-    } finally {
-      // Cookie is gone server-side; refreshing re-renders the (server) page,
-      // which now falls through to the login view.
-      router.refresh();
+      ok = res.ok;
+    } catch {
+      ok = false;
     }
+    if (!ok) {
+      setBusyLogout(false);
+      setArchiveMessage(all
+        ? "Could not sign out everywhere — the server did not confirm it, so assume nothing was revoked."
+        : "Could not sign out — please try again.");
+      return;
+    }
+    // The session is gone server-side; refreshing re-renders the (server) page,
+    // which now falls through to the login view.
+    router.refresh();
   }
 
   return (

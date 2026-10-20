@@ -11,3 +11,7 @@ test('constantTimeEqual', () => {
   expect(constantTimeEqual('abc', 'abd')).toBe(false)
   expect(constantTimeEqual('abc', 'abcd')).toBe(false)
 })
+test('constantTimeEqual handles length differences without throwing', () => {
+  expect(constantTimeEqual('', '')).toBe(true)
+  expect(constantTimeEqual('a'.repeat(1000), 'a')).toBe(false)
+})

@@ -30,7 +30,16 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
   const d = new Date()
   const today = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 
-  const result = await runArchive({
+  const pruneRate = async () => {
+    // Keep rate_events from growing without bound (it was never pruned). Windows
+    // are minute/day and the login lockout looks back 30 minutes, so retaining 2
+    // days is safe. Runs even when the archive itself fails: /privacy promises
+    // hashed IPs are gone after two days whatever else happens.
+    await pruneRateEvents(sql, new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
+  }
+  let result: { archived: number; archiveName?: string }
+  try {
+    result = await runArchive({
     listUnarchived: () => listUnarchived(sql),
     downloadImage: (id) => drive.downloadFile(id),
     uploadArchive: async (name, bytes) => {
@@ -41,13 +50,9 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
     markArchived: (ids, ref) => markArchived(sql, ids, ref),
     deleteImage: (id) => drive.deleteFile(id),
   }, today)
-
-  // Keep rate_events from growing without bound (it was never pruned). Windows
-  // are minute/day, so retaining 2 days is safe; the created_at index makes both
-  // this delete and the global count cheap.
-  const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  await pruneRateEvents(sql, cutoff)
-
+  } finally {
+    await pruneRate()
+  }
   return result
 }
 

@@ -35,3 +35,17 @@ test('runRetention deletes, purges and counts failures without stopping', async 
   expect(deleted).toEqual(['b'])
   expect(purgedBefore).toBe('2025-10-20T03:00:00.000Z')
 })
+
+test('a Drive failure does not stop the database purges', async () => {
+  const done: string[] = []
+  const deps: RetentionDeps = {
+    listArchives: async () => { throw new Error('drive down') },
+    deleteArchive: async () => {},
+    purgeReports: async () => { done.push('reports'); return 2 },
+    purgeCrashes: async () => { done.push('crashes') },
+    purgeAudit: async () => { throw new Error('db hiccup') },
+    purgeEphemeral: async () => { done.push('ephemeral') },
+  }
+  expect(await runRetention(deps, NOW)).toEqual({ archivesDeleted: 0, reportsDeleted: 2, failures: 2 })
+  expect(done).toEqual(['reports', 'crashes', 'ephemeral'])
+})

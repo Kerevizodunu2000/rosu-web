@@ -7,7 +7,7 @@
 // must stay safe to re-run: CREATE ... IF NOT EXISTS / ADD COLUMN IF NOT EXISTS.
 // Bump SCHEMA_VERSION whenever a statement is added.
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS schema_meta (
@@ -71,6 +71,11 @@ export const SCHEMA_STATEMENTS = [
     revoked_at  timestamptz,
     ip_hash     text
   )`,
+  // v1.3 (schema 3): every session descends from one sign-in (its family), and a
+  // session id can be rotated exactly once — logout ends the whole family.
+  `ALTER TABLE admin_sessions ADD COLUMN IF NOT EXISTS family text`,
+  `ALTER TABLE admin_sessions ADD COLUMN IF NOT EXISTS rotated_at timestamptz`,
+  `CREATE INDEX IF NOT EXISTS admin_sessions_family_idx ON admin_sessions (family)`,
   `CREATE TABLE IF NOT EXISTS admin_audit (
     id      bigserial PRIMARY KEY,
     at      timestamptz NOT NULL DEFAULT now(),

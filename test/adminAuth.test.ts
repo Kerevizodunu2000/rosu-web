@@ -26,16 +26,18 @@ function deps(over: Partial<LoginDeps> = {}) {
   const audit: string[] = []
   const used = new Set<number>()
   let sessions = 0
+  let failures = 0
   const d: LoginDeps = {
     adminPassword: 'pw', totpSecret: '',
     checkRateLimit: async () => ({ allowed: true }),
     failuresSince: async () => ({ count: 0, last: null }),
+    recordFailure: async () => { failures++ },
     claimTotpStep: async (s) => (used.has(s) ? false : (used.add(s), true)),
     audit: async (e, detail) => { audit.push(detail ? `${e}:${detail}` : e) },
     startSession: async () => { sessions++; return { token: 'T', maxAge: 60 } },
     ...over,
   }
-  return { d, audit, sessions: () => sessions }
+  return { d, audit, sessions: () => sessions, failures: () => failures }
 }
 
 test('password-only login succeeds and is audited', async () => {
@@ -47,11 +49,12 @@ test('password-only login succeeds and is audited', async () => {
   expect(audit).toEqual(['login_ok:password'])
 })
 
-test('wrong password: generic error, audited, no session', async () => {
-  const { d, audit, sessions } = deps()
+test('wrong password: generic error, counted + audited, no session', async () => {
+  const { d, audit, sessions, failures } = deps()
   const r = await handleLogin({ password: 'nope', code: '' }, d, NOW)
   expect(r).toMatchObject({ status: 401, body: { ok: false, error: 'invalid' } })
   expect(sessions()).toBe(0)
+  expect(failures()).toBe(1)
   expect(audit).toEqual(['login_fail:password'])
 })
 
@@ -65,12 +68,13 @@ test('TOTP required when configured; each code works once', async () => {
   expect(audit).toEqual(['login_fail:totp_missing', 'login_fail:totp', 'login_ok:password+totp', 'login_fail:totp_replay'])
 })
 
-test('lockout blocks even the right password and says how long', async () => {
-  const { d, sessions } = deps({ failuresSince: async () => ({ count: 4, last: new Date(NOW - 10_000).toISOString() }) })
+test('lockout blocks even the right password, says how long, and is not audited', async () => {
+  const { d, sessions, audit } = deps({ failuresSince: async () => ({ count: 4, last: new Date(NOW - 10_000).toISOString() }) })
   const r = await handleLogin({ password: 'pw', code: '' }, d, NOW)
   expect(r.status).toBe(429)
   expect(r.body).toEqual({ ok: false, error: 'locked', retry_after: 50 })
   expect(sessions()).toBe(0)
+  expect(audit).toEqual([])
 })
 
 test('rate limit is checked first', async () => {

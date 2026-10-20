@@ -112,7 +112,7 @@ export async function purgeArchivedReportsBefore(sql: Sql, beforeIso: string): P
 
 // ── rate limiting ─────────────────────────────────────────────────────────────
 
-export type RateKind = 'report' | 'login' | 'crash' | 'ack'
+export type RateKind = 'report' | 'login' | 'login_fail' | 'crash' | 'ack' | 'ack_to'
 export async function recordRateEvent(sql: Sql, ip_hash: string, kind: RateKind = 'report'): Promise<void> {
   await sql`INSERT INTO rate_events (ip_hash, kind) VALUES (${ip_hash}, ${kind})`
 }
@@ -131,9 +131,9 @@ export async function pruneRateEvents(sql: Sql, beforeIso: string): Promise<void
 // ── admin sessions ────────────────────────────────────────────────────────────
 
 export type AdminSessionRow = { id: string; auth_time: string; expires_at: string }
-export async function insertAdminSession(sql: Sql, v: { id: string; authTime: string; expiresAt: string; ipHash: string }): Promise<void> {
-  await sql`INSERT INTO admin_sessions (id, auth_time, expires_at, ip_hash)
-    VALUES (${v.id}, ${v.authTime}, ${v.expiresAt}, ${v.ipHash})`
+export async function insertAdminSession(sql: Sql, v: { id: string; family: string; authTime: string; expiresAt: string; ipHash: string }): Promise<void> {
+  await sql`INSERT INTO admin_sessions (id, family, auth_time, expires_at, ip_hash)
+    VALUES (${v.id}, ${v.family}, ${v.authTime}, ${v.expiresAt}, ${v.ipHash})`
 }
 /** The session if it exists, is not revoked and has not expired; otherwise null. */
 export async function getLiveAdminSession(sql: Sql, id: string): Promise<AdminSessionRow | null> {
@@ -142,12 +142,17 @@ export async function getLiveAdminSession(sql: Sql, id: string): Promise<AdminSe
   if (!rows[0]) return null
   return { id: String(rows[0].id), auth_time: iso(rows[0].auth_time) as string, expires_at: iso(rows[0].expires_at) as string }
 }
-/** Shorten a session's life (used for the rotation grace window). Never extends it. */
-export async function expireAdminSessionAt(sql: Sql, id: string, atIso: string): Promise<void> {
-  await sql`UPDATE admin_sessions SET expires_at = LEAST(expires_at, ${atIso}::timestamptz) WHERE id = ${id}`
+/** Rotate a session id at most once: mark it and cap its life at the grace instant. */
+export async function claimAdminSessionRotation(sql: Sql, id: string, graceUntilIso: string): Promise<boolean> {
+  const rows = await sql`UPDATE admin_sessions SET rotated_at = now(),
+      expires_at = LEAST(expires_at, ${graceUntilIso}::timestamptz)
+    WHERE id = ${id} AND rotated_at IS NULL AND revoked_at IS NULL AND expires_at > now()
+    RETURNING id` as { id: string }[]
+  return rows.length > 0
 }
-export async function revokeAdminSession(sql: Sql, id: string): Promise<void> {
-  await sql`UPDATE admin_sessions SET revoked_at = now() WHERE id = ${id} AND revoked_at IS NULL`
+/** End a sign-in: every session rotated from it, including any still in grace. */
+export async function revokeAdminSessionFamily(sql: Sql, family: string): Promise<void> {
+  await sql`UPDATE admin_sessions SET revoked_at = now() WHERE family = ${family} AND revoked_at IS NULL`
 }
 export async function revokeAllAdminSessions(sql: Sql): Promise<number> {
   const rows = await sql`UPDATE admin_sessions SET revoked_at = now() WHERE revoked_at IS NULL RETURNING id` as { id: string }[]
@@ -164,7 +169,7 @@ export async function purgeAdminSessions(sql: Sql, beforeIso: string): Promise<v
 // ── admin audit log ───────────────────────────────────────────────────────────
 
 export type AuditEvent =
-  | 'login_ok' | 'login_fail' | 'login_locked' | 'logout' | 'logout_all'
+  | 'login_ok' | 'login_fail' | 'logout' | 'logout_all'
   | 'archive' | 'status_change' | 'maintenance'
 export type AuditRow = { id: number; at: string; event: AuditEvent; ip_hash: string | null; detail: string | null }
 
@@ -176,11 +181,20 @@ export async function listAudit(sql: Sql, limit: number): Promise<AuditRow[]> {
   return rows.map((r) => ({ id: Number(r.id), at: iso(r.at) as string, event: r.event as AuditEvent,
     ip_hash: (r.ip_hash as string | null) ?? null, detail: (r.detail as string | null) ?? null }))
 }
-/** Failed logins from one IP-hash since a time, plus when the latest one happened. */
+/**
+ * Failed logins from one address since a time, plus when the latest happened.
+ * Counted from rate events (kept two days), not the audit log, so the audit
+ * cap below can never weaken the lockout.
+ */
 export async function loginFailuresSince(sql: Sql, ipHash: string, sinceIso: string): Promise<{ count: number; last: string | null }> {
-  const rows = await sql`SELECT count(*)::int AS n, max(at) AS last FROM admin_audit
-    WHERE event = 'login_fail' AND ip_hash = ${ipHash} AND at > ${sinceIso}` as Record<string, unknown>[]
+  const rows = await sql`SELECT count(*)::int AS n, max(created_at) AS last FROM rate_events
+    WHERE kind = 'login_fail' AND ip_hash = ${ipHash} AND created_at > ${sinceIso}` as Record<string, unknown>[]
   return { count: Number(rows[0]?.n ?? 0), last: iso(rows[0]?.last) }
+}
+/** How many entries of one audit event were written since a time (for the per-hour cap). */
+export async function countAuditSince(sql: Sql, event: AuditEvent, sinceIso: string): Promise<number> {
+  const rows = await sql`SELECT count(*)::int AS n FROM admin_audit WHERE event = ${event} AND at > ${sinceIso}` as { n: number }[]
+  return rows[0].n
 }
 export async function purgeAuditBefore(sql: Sql, beforeIso: string): Promise<void> {
   await sql`DELETE FROM admin_audit WHERE at < ${beforeIso}`
@@ -204,17 +218,26 @@ export type CrashGroup = {
   fingerprint: string; exc_type: string; message: string | null; frames: string
   first_seen: string; last_seen: string; hits: number; users: number; last_version: string | null
 }
+/**
+ * At most this many distinct crashes are tracked. Fingerprints come from
+ * client-chosen data, so without a cap junk could push real crashes off the
+ * panel; past it, known crashes still count but new ones are dropped.
+ */
+export const MAX_CRASH_GROUPS = 500
 export async function recordCrash(sql: Sql, c: {
   fingerprint: string; excType: string; message: string; frames: string
   appVersion: string; os: string; ipHash: string
 }): Promise<void> {
   await sql.transaction((txn) => [
     txn`INSERT INTO crash_groups (fingerprint, exc_type, message, frames, hits, last_version)
-        VALUES (${c.fingerprint}, ${c.excType}, ${c.message}, ${c.frames}, 1, ${c.appVersion})
+        SELECT ${c.fingerprint}, ${c.excType}, ${c.message}, ${c.frames}, 1, ${c.appVersion}
+        WHERE EXISTS (SELECT 1 FROM crash_groups WHERE fingerprint = ${c.fingerprint})
+           OR (SELECT count(*) FROM crash_groups) < ${MAX_CRASH_GROUPS}
         ON CONFLICT (fingerprint) DO UPDATE SET hits = crash_groups.hits + 1, last_seen = now(),
           message = EXCLUDED.message, last_version = EXCLUDED.last_version`,
     txn`INSERT INTO crash_events (fingerprint, app_version, os, ip_hash)
-        VALUES (${c.fingerprint}, ${c.appVersion}, ${c.os}, ${c.ipHash})`,
+        SELECT ${c.fingerprint}, ${c.appVersion}, ${c.os}, ${c.ipHash}
+        WHERE EXISTS (SELECT 1 FROM crash_groups WHERE fingerprint = ${c.fingerprint})`,
   ])
 }
 export async function listCrashGroups(sql: Sql, limit: number): Promise<CrashGroup[]> {

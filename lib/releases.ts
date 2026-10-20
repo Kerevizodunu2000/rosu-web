@@ -51,6 +51,24 @@ export function parseLatestRelease(json: unknown): LatestVersion | null {
   }
 }
 
+type Memo = { at: number; value: LatestVersion }
+let memo: Memo | null = null
+export const MEMO_TTL_MS = 15 * 60 * 1000
+
+/**
+ * The latest release, remembered per server instance for 15 minutes. The CDN
+ * caches responses too, but a query string (``?x=1``) bypasses it — this keeps
+ * such requests from turning into GitHub API calls. Failures are not memoised.
+ */
+export async function latestReleaseCached(fetcher: () => Promise<LatestVersion | null> = fetchLatestRelease,
+  nowMs = Date.now()): Promise<LatestVersion | null> {
+  if (memo && nowMs - memo.at < MEMO_TTL_MS) return memo.value
+  const value = await fetcher()
+  if (value) memo = { at: nowMs, value }
+  return value ?? memo?.value ?? null
+}
+export function _resetReleaseMemo() { memo = null }
+
 export async function fetchLatestRelease(fetchImpl: typeof fetch = fetch, token = process.env.GITHUB_TOKEN): Promise<LatestVersion | null> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',

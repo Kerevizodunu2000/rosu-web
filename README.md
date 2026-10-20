@@ -115,7 +115,9 @@ Set these in Vercel (Project → Settings → Environment Variables) and, for lo
 ### Admin security
 
 - Sign-in = password (constant-time) + optional TOTP code (each code works once). Failed attempts from one address trigger a progressive lockout (30 s, doubling, max 15 min) on top of the per-IP rate limit. Every sign-in and admin action lands in an audit log shown in the panel.
-- Sessions live server-side: a `__Host-` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`) carries only a random session id. Idle timeout 2 h, absolute 12 h, a fresh id every 15 min of use; logout and "sign out everywhere" revoke on the server.
+- Sessions live server-side: a `__Host-` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`) carries only a random session id. Idle timeout 2 h, absolute 12 h, a fresh id every 15 min of use (each id rotates once); logout ends the whole sign-in and "sign out everywhere" revokes every session on the server.
+- With `ADMIN_PATH` set, admin routes answer only through the proxy (which stamps a gate header); a malformed value disables the panel rather than exposing `/admin`.
+- Limits and lockouts key on the IPv6 /64 (IPv4: the address).
 
 ## Privacy
 

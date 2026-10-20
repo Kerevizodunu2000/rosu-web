@@ -95,7 +95,6 @@ export function CrashPanel({ crashes }: { crashes: CrashGroup[] }) {
 const EVENT_LABELS: Record<AuditRow["event"], string> = {
   login_ok: "Signed in",
   login_fail: "Failed sign-in",
-  login_locked: "Sign-in blocked (lockout)",
   logout: "Signed out",
   logout_all: "Signed out everywhere",
   archive: "Archive run",
@@ -113,7 +112,7 @@ export function AuditPanel({ events }: { events: AuditRow[] }) {
           {events.map((e) => (
             <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
               <time dateTime={e.at} className="font-mono text-xs tabular-nums text-fg-muted">{when(e.at)}</time>
-              <span className={e.event === "login_fail" || e.event === "login_locked" ? "font-medium text-accent-rose" : "font-medium text-fg"}>
+              <span className={e.event === "login_fail" ? "font-medium text-accent-rose" : "font-medium text-fg"}>
                 {EVENT_LABELS[e.event] ?? e.event}
               </span>
               {e.detail && <span className="text-xs text-fg-muted">{e.detail}</span>}

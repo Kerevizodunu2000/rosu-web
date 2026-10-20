@@ -19,6 +19,8 @@ export const LOGIN_LIMITS: RateLimits = { perIpMinute: 5, perIpDay: 30, globalDa
  * small budget (Resend's free tier is 100/day) on top of the report limits.
  */
 export const ACK_LIMITS: RateLimits = { perIpMinute: 2, perIpDay: 3, globalDay: 50 }
+/** …and at most one per recipient address per day, however many senders try. */
+export const ACK_RECIPIENT_LIMITS: RateLimits = { perIpMinute: 1, perIpDay: 1, globalDay: Number.POSITIVE_INFINITY }
 /** Opt-in desktop crash fingerprints: chattier than reports, still bounded. */
 export const CRASH_LIMITS: RateLimits = { perIpMinute: 10, perIpDay: 50, globalDay: 3000 }
 

@@ -56,3 +56,21 @@ test('handleCrash: desktop UA + token required, fail closed, rate limited', asyn
   expect(recorded).toEqual([ok.body.fingerprint])
   expect(ok.body.fingerprint).not.toBe('client-chosen')
 })
+
+test('handleCrash rejects a wrong token before doing any parsing work', async () => {
+  let rateChecked = false
+  const huge = { ...valid, token: 'NO', message: 'a'.repeat(30_000) }
+  const t0 = Date.now()
+  const r = await handleCrash({ raw: huge, userAgent: 'Rosu/1.8.0',
+    deps: { appToken: 'TOK', checkRateLimit: async () => { rateChecked = true; return { allowed: true } }, record: async () => {} } })
+  expect(r.body.error).toBe('unauthorized')
+  expect(rateChecked).toBe(false)
+  expect(Date.now() - t0).toBeLessThan(200)
+})
+
+test('a huge message is clipped before scrubbing (bounded time)', () => {
+  const t0 = Date.now()
+  const r = parseCrash({ ...valid, message: 'a'.repeat(30_000) + '@' })
+  expect(Date.now() - t0).toBeLessThan(200)
+  expect(r.ok && r.value.message.length).toBeLessThanOrEqual(300)
+})

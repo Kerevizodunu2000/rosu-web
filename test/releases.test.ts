@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test, expect } from 'vitest'
-import { parseLatestRelease, fetchLatestRelease, NOTES_MAX } from '@/lib/releases'
+import { parseLatestRelease, fetchLatestRelease, latestReleaseCached, _resetReleaseMemo, MEMO_TTL_MS, NOTES_MAX } from '@/lib/releases'
 
 const gh = {
   tag_name: 'v1.7.1', name: 'Rosu v1.7.1 — Prune', html_url: 'https://github.com/Kerevizodunu2000/rosu/releases/tag/v1.7.1',
@@ -40,4 +40,20 @@ test('fetchLatestRelease: upstream failure → null', async () => {
   expect(await fetchLatestRelease(fail, '')).toBeNull()
   const ok = (async () => new Response(JSON.stringify(gh), { status: 200 })) as typeof fetch
   expect((await fetchLatestRelease(ok, ''))?.version).toBe('1.7.1')
+})
+
+test('latestReleaseCached hits upstream at most once per TTL and keeps the last good value', async () => {
+  _resetReleaseMemo()
+  let calls = 0
+  const good = parseLatestRelease(gh)!
+  const fetcher = async () => { calls++; return calls === 3 ? null : good }
+  const t = 1_000_000
+  expect(await latestReleaseCached(fetcher, t)).toEqual(good)
+  expect(await latestReleaseCached(fetcher, t + 1000)).toEqual(good)
+  expect(calls).toBe(1)
+  expect(await latestReleaseCached(fetcher, t + MEMO_TTL_MS + 1)).toEqual(good)   // refreshed
+  expect(calls).toBe(2)
+  expect(await latestReleaseCached(fetcher, t + 2 * MEMO_TTL_MS + 2)).toEqual(good) // upstream failed: stale is fine
+  expect(calls).toBe(3)
+  _resetReleaseMemo()
 })

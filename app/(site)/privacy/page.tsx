@@ -72,7 +72,8 @@ export default function PrivacyPage() {
           on <strong className="text-fg">crash reports</strong> in the Rosu app, a crash sends the
           error type, a short error message with file paths and e-mail addresses removed, the names
           of the code locations involved, the Rosu version and your operating system — no files,
-          no library contents, no usernames.
+          no library contents, no usernames — together with a separately salted hash of your IP
+          address, used only to count how many different people hit the same crash.
         </PolicyBlock>
 
         <PolicyBlock title="Why (lawful basis)">
@@ -100,7 +101,8 @@ export default function PrivacyPage() {
           Google Drive; working copies are removed once archived. Reports, archives, crash reports and
           the admin activity log are <strong className="text-fg">deleted automatically after 12
           months</strong> by a nightly job, and sooner on request (see below). Hashed IP addresses used
-          for rate limiting are kept for two days.
+          for rate limiting are kept for two days; the crash-report hash stays with its crash report
+          for up to 12 months.
         </PolicyBlock>
 
         <PolicyBlock title="Your choices">
@@ -170,7 +172,8 @@ export default function PrivacyPage() {
           uygulamasında <strong className="text-fg">çökme raporlarını</strong> açarsan, bir çökme;
           hata türünü, dosya yolları ve e-posta adresleri temizlenmiş kısa bir hata mesajını, ilgili
           kod konumlarının adlarını, Rosu sürümünü ve işletim sistemini gönderir — dosya, kütüphane
-          içeriği veya kullanıcı adı gönderilmez.
+          içeriği veya kullanıcı adı gönderilmez — ve bunlarla birlikte, yalnızca aynı çökmeyi kaç
+          farklı kişinin yaşadığını saymak için kullanılan, ayrıca tuzlanmış bir IP hash&apos;i.
         </PolicyBlock>
 
         <PolicyBlock title="Neden (hukuki dayanak)">
@@ -198,7 +201,7 @@ export default function PrivacyPage() {
           raporları ve yönetici etkinlik kaydı her gece çalışan bir işle{" "}
           <strong className="text-fg">12 ay sonra otomatik olarak silinir</strong>; talep edersen daha
           önce sileriz (aşağıya bak). Hız sınırlaması için kullanılan hash&apos;lenmiş IP adresleri iki
-          gün saklanır.
+          gün saklanır; çökme raporu hash&apos;i ise ait olduğu raporla birlikte en fazla 12 ay kalır.
         </PolicyBlock>
 
         <PolicyBlock title="Seçeneklerin">

@@ -7,7 +7,7 @@ import { requireEnv } from '@/lib/env'
 export const runtime = 'nodejs'
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req)
-  if (admin instanceof NextResponse) return new NextResponse('unauthorized', { status: 401 })
+  if (admin instanceof NextResponse) return admin
   const { id } = await ctx.params
   const idNum = Number(id)
   if (!Number.isSafeInteger(idNum) || idNum <= 0) return new NextResponse('not found', { status: 404 })

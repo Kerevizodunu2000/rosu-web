@@ -2,11 +2,12 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { handleReport } from '@/lib/reportService'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { checkRateLimit, REPORT_LIMITS, ACK_LIMITS } from '@/lib/ratelimit'
+import { checkRateLimit, REPORT_LIMITS, ACK_LIMITS, ACK_RECIPIENT_LIMITS } from '@/lib/ratelimit'
 import { runArchiveJob } from '@/lib/archiveJob'
 import { getDb, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince, countUnarchived } from '@/lib/db'
 import { DriveClient } from '@/lib/drive'
-import { clientIp } from '@/lib/net'
+import { clientIp, rateIp } from '@/lib/net'
+import { hashIp } from '@/lib/crypto'
 import { requireEnv } from '@/lib/env'
 import { newStatusToken, statusUrl } from '@/lib/reportStatus'
 import { ackConfig, sendAckEmail } from '@/lib/email'
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     const sql = await getDb()
     const result = await handleReport({
-      raw, ip: clientIp(req), userAgent: req.headers.get('user-agent') || '',
+      raw, ip: clientIp(req), rateKey: rateIp(req), userAgent: req.headers.get('user-agent') || '',
       deps: {
         salt: requireEnv('IP_HASH_SALT'), appToken: process.env.REPORT_APP_TOKEN || '', turnstileSecret: requireEnv('TURNSTILE_SECRET_KEY'),
         verifyTurnstile,
@@ -58,11 +59,20 @@ export async function POST(req: NextRequest) {
         newStatusToken,
         statusUrl: (token) => statusUrl(token),
         ackEmailEnabled: ack !== null,
-        allowAck: async (ipHash) => (await checkRateLimit(ipHash, {
-          countEventsSince: (ip, since) => countEventsSince(sql, ip, since, 'ack'),
-          countAllEventsSince: (since) => countAllEventsSince(sql, since, 'ack'),
-          recordRateEvent: (ip) => recordRateEvent(sql, ip, 'ack'),
-        }, Date.now(), ACK_LIMITS)).allowed,
+        allowAck: async (ipHash, recipient) => {
+          const toHash = hashIp('ack-to:' + recipient.trim().toLowerCase(), requireEnv('IP_HASH_SALT'))
+          const perRecipient = await checkRateLimit(toHash, {
+            countEventsSince: (h, since) => countEventsSince(sql, h, since, 'ack_to'),
+            countAllEventsSince: (since) => countAllEventsSince(sql, since, 'ack_to'),
+            recordRateEvent: (h) => recordRateEvent(sql, h, 'ack_to'),
+          }, Date.now(), ACK_RECIPIENT_LIMITS)
+          if (!perRecipient.allowed) return false
+          return (await checkRateLimit(ipHash, {
+            countEventsSince: (ip, since) => countEventsSince(sql, ip, since, 'ack'),
+            countAllEventsSince: (since) => countAllEventsSince(sql, since, 'ack'),
+            recordRateEvent: (ip) => recordRateEvent(sql, ip, 'ack'),
+          }, Date.now(), ACK_LIMITS)).allowed
+        },
       },
     })
     const ackEmail = result.followUp?.ackEmail

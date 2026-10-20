@@ -16,7 +16,7 @@ export type ReportDeps = {
   /** Whether confirmation e-mails are configured (RESEND_API_KEY + ACK_EMAIL_FROM). */
   ackEmailEnabled: boolean
   /** Separate, tight budget for confirmation e-mails (they go to an unverified address). */
-  allowAck: (ipHash: string) => Promise<boolean>
+  allowAck: (ipHash: string, recipient: string) => Promise<boolean>
 }
 /** Work the route performs after responding (kept out of the request's critical path). */
 export type FollowUp = { ackEmail?: { to: string; id: number; statusUrl: string } }
@@ -24,7 +24,7 @@ type Result = { status: number; body: { ok: boolean; id?: number; error?: string
 const ok = (id: number, status_url?: string): Result => ({ status: 200, body: status_url ? { ok: true, id, status_url } : { ok: true, id } })
 const fail = (status: number, error: string): Result => ({ status, body: { ok: false, error } })
 
-export async function handleReport(a: { raw: unknown; ip: string; userAgent: string; deps: ReportDeps }): Promise<Result> {
+export async function handleReport(a: { raw: unknown; ip: string; rateKey?: string; userAgent: string; deps: ReportDeps }): Promise<Result> {
   const { deps } = a
   const parsed = parseReport(a.raw)
   if (!parsed.ok) return parsed.error === 'missing_fields' ? fail(400, 'missing_fields') : fail(400, parsed.error)
@@ -45,7 +45,8 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
     return fail(200, 'captcha') // browser without a solved captcha
   }
 
-  const ipHash = hashIp(a.ip, deps.salt)
+  // rateKey = the address as a rate-limit identity (an IPv6 /64), see lib/net.ts.
+  const ipHash = hashIp(a.rateKey ?? a.ip, deps.salt)
   const rl = await deps.checkRateLimit(ipHash)
   if (!rl.allowed) return fail(429, rl.reason ?? 'rate_limited')
 
@@ -70,7 +71,7 @@ export async function handleReport(a: { raw: unknown; ip: string; userAgent: str
     } catch { await deps.setReportImage(id, { image_status: 'error' }) }
   }
   const result = ok(id, status_url)
-  if (v.ackEmail && deps.ackEmailEnabled && isEmail(v.contact) && await deps.allowAck(ipHash)) {
+  if (v.ackEmail && deps.ackEmailEnabled && isEmail(v.contact) && await deps.allowAck(ipHash, v.contact)) {
     result.followUp = { ackEmail: { to: v.contact, id, statusUrl: status_url } }
   }
   return result

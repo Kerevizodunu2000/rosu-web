@@ -8,19 +8,23 @@ import {
 const SECRET = 'secret-value-32-bytes-minimum-xxxx'
 
 function memStore(clock: { now: number }) {
-  const rows = new Map<string, { authTime: string; expiresAt: string; revoked: boolean }>()
+  const rows = new Map<string, { family: string; authTime: string; expiresAt: string; revoked: boolean; rotated: boolean }>()
   const store: SessionStore = {
-    insert: async (v) => { rows.set(v.id, { authTime: v.authTime, expiresAt: v.expiresAt, revoked: false }) },
+    insert: async (v) => { rows.set(v.id, { family: v.family, authTime: v.authTime, expiresAt: v.expiresAt, revoked: false, rotated: false }) },
     isLive: async (id) => {
       const r = rows.get(id)
       return !!r && !r.revoked && Date.parse(r.expiresAt) > clock.now
     },
-    expireAt: async (id, at) => {
+    claimRotation: async (id, until) => {
       const r = rows.get(id)
-      if (r && Date.parse(at) < Date.parse(r.expiresAt)) r.expiresAt = at
+      if (!r || r.rotated || r.revoked || Date.parse(r.expiresAt) <= clock.now) return false
+      r.rotated = true
+      if (Date.parse(until) < Date.parse(r.expiresAt)) r.expiresAt = until
+      return true
     },
   }
-  return { store, rows }
+  const revokeFamily = (family: string) => { for (const r of rows.values()) if (r.family === family) r.revoked = true }
+  return { store, rows, revokeFamily }
 }
 
 test('issued session verifies; wrong secret, garbage and missing do not', async () => {
@@ -82,4 +86,31 @@ test('rotation never extends past the absolute 12 h cap', async () => {
   }
   expect(clock.now - start).toBeGreaterThan(SESSION_MAX_SECONDS * 1000)
   expect(await verifySession(store, token, SECRET, clock.now)).toBeNull()
+})
+
+test('a rotated id cannot be rotated again: no fork from a replayed or concurrent old cookie', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store, rows, revokeFamily } = memStore(clock)
+  const first = await issueSession(store, SECRET, { nowMs: clock.now })
+  clock.now += (ROTATE_AFTER_SECONDS + 1) * 1000
+  const a = await rotateIfDue(store, first.token, SECRET, clock.now)
+  const b = await rotateIfDue(store, first.token, SECRET, clock.now)   // replay / concurrent load
+  expect(a).not.toBeNull()
+  expect(b).toBeNull()
+  expect([...rows.values()].filter((r) => !r.revoked).length).toBe(2)   // old (in grace) + one new
+  // Logout ends the whole sign-in, the in-grace old id included.
+  revokeFamily(a!.family)
+  expect(await verifySession(store, first.token, SECRET, clock.now)).toBeNull()
+  expect(await verifySession(store, a!.token, SECRET, clock.now)).toBeNull()
+})
+
+test('the family is carried through rotations', async () => {
+  const clock = { now: Date.UTC(2026, 9, 20, 12) }
+  const { store } = memStore(clock)
+  const first = await issueSession(store, SECRET, { nowMs: clock.now })
+  expect(first.family).toBe(first.sid)
+  clock.now += (ROTATE_AFTER_SECONDS + 1) * 1000
+  const next = await rotateIfDue(store, first.token, SECRET, clock.now)
+  expect(next!.family).toBe(first.family)
+  expect((await readSessionToken(next!.token, SECRET, clock.now))?.family).toBe(first.family)
 })

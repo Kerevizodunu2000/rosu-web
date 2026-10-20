@@ -23,20 +23,28 @@ Security & platform release.
   status editor.
 - **Opt-in confirmation e-mail** (Resend) with the tracking link. Off unless
   `RESEND_API_KEY` and `ACK_EMAIL_FROM` are both set; never echoes anything the
-  reporter typed; its own tight rate budget (3/day per address, 50/day overall).
+  reporter typed; its own tight budget (one per recipient a day, 3/day per sender,
+  50/day overall).
 - **`GET /api/latest-version`** — the latest desktop release (version, release page,
   `.exe` + `.sha256` download URLs, release-notes excerpt) from GitHub Releases,
-  CDN-cached, for the app's update check.
-- **`POST /api/crash`** — opt-in crash fingerprints from the desktop app (shared
-  token + rate limit). The server scrubs paths and e-mail addresses, computes the
-  fingerprint itself, and the admin panel groups identical crashes with a
-  distinct-users count.
+  CDN-cached and memoised per instance (a cache-busting query string cannot drive
+  GitHub calls), for the app's update check.
+- **`POST /api/crash`** — opt-in crash fingerprints from the desktop app. Token and
+  rate limit are checked before any parsing; the server clips and scrubs paths and
+  e-mail addresses, computes the fingerprint itself, keeps at most 500 distinct
+  crashes, and the admin panel groups identical crashes with a distinct-users count
+  (from a crash-only salted IP hash, disclosed in the policy).
 - **Admin two-factor sign-in** (TOTP, RFC 6238) via `ADMIN_TOTP_SECRET`; each code is
   accepted once. `scripts/totp-setup.mjs` generates the secret.
 - **Secret admin path** (`ADMIN_PATH`): the panel moves to `/<slug>` and `/admin` +
-  `/api/admin/*` answer 404.
+  `/api/admin/*` answer 404. Admin routes also require the proxy's gate header, so a
+  path the proxy does not see cannot reveal them; dot segments and double encoding
+  under the slug are refused; a malformed `ADMIN_PATH` disables the panel instead of
+  falling back to `/admin`.
 - **Progressive login lockout** (30 s, doubling, max 15 min per address) on top of the
-  per-IP rate limit.
+  per-IP rate limit. Failed attempts are counted in short-lived rate events; at most
+  60 failed sign-ins an hour are written to the audit log, so a flood cannot bury
+  real events.
 - **Admin audit log** (Neon) of sign-ins, lockouts, logouts, archive runs, status
   changes and retention sweeps, shown in the panel with a security summary.
 - **Cron watchdog** — the nightly job pings `HEALTHCHECKS_PING_URL` on success and
@@ -45,12 +53,20 @@ Security & platform release.
 ### Changed
 - **12-month retention is now enforced**: the nightly job deletes archive ZIPs, archived
   report rows, crash data and audit entries older than twelve months, as `/privacy`
-  promises. The policy (EN + TR) now also covers tracking links, confirmation e-mails
+  promises. Each purge runs independently (a Drive outage no longer skips the
+  database purges), the two-day rate-event prune runs even when archiving fails, and
+  any failed step pings the watchdog's `/fail`. The policy (EN + TR) now also covers tracking links, confirmation e-mails
   (Resend) and opt-in crash reports.
 - **Admin sessions are server-side**: the cookie (`__Host-`, `SameSite=Strict`) carries
   a random session id stored in Neon — logout and "sign out everywhere" revoke it;
-  idle timeout 2 h, absolute 12 h, rotated every 15 minutes of use. Existing sessions
-  are signed out once by this upgrade.
+  idle timeout 2 h, absolute 12 h, rotated every 15 minutes of use. An id is rotated
+  at most once (atomic claim), so a replayed or concurrent old cookie cannot fork the
+  session, and logout ends every session descended from that sign-in. A database
+  failure during "sign out everywhere" is reported instead of answered with "ok".
+  Existing sessions are signed out once by this upgrade.
+- Rate limits and lockouts key on the IPv6 /64 (IPv4: the address), so rotating
+  addresses inside one allocation no longer resets them.
+- Secrets are compared in constant time including their length.
 - Admin API calls check the request `Origin` (defence in depth against CSRF).
 - Rate-limit events carry a `kind`, so login, report, crash and e-mail budgets no
   longer share one global counter (login spam could previously exhaust the global

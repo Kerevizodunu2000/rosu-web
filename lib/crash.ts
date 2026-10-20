@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto'
 import { constantTimeEqual } from './crypto'
 
-export const CRASH_LIMITS_INPUT = { excType: 120, message: 300, frames: 40, frame: 160, body: 32 * 1024 } as const
+export const CRASH_LIMITS_INPUT = { excType: 120, message: 300, frames: 30, frame: 160, body: 32 * 1024 } as const
 
 export type CrashInput = { excType: string; message: string; frames: string[]; appVersion: string; os: string }
 
@@ -51,10 +51,12 @@ export function parseCrash(raw: unknown): { ok: true; value: CrashInput & { toke
     ok: true,
     value: {
       excType,
-      message: scrubText(s(d.message)).trim().slice(0, CRASH_LIMITS_INPUT.message),
+      // Clip BEFORE scrubbing: the scrub regexes are not linear on hostile
+      // input, and nothing past the stored length matters anyway.
+      message: scrubText(s(d.message).slice(0, CRASH_LIMITS_INPUT.message * 2)).trim().slice(0, CRASH_LIMITS_INPUT.message),
       frames,
       appVersion: s(d.app_version).slice(0, 40),
-      os: scrubText(s(d.os)).slice(0, 120),
+      os: scrubText(s(d.os).slice(0, 200)).slice(0, 120),
       token: s(d.token),
     },
   }
@@ -73,14 +75,18 @@ export type CrashDeps = {
 
 export async function handleCrash(a: { raw: unknown; userAgent: string; deps: CrashDeps }):
   Promise<{ status: number; body: { ok: boolean; error?: string; fingerprint?: string } }> {
-  // Desktop-only endpoint: same shared friction token as /api/report, fail closed.
+  // Desktop-only endpoint: same shared friction token as /api/report, fail
+  // closed — and checked, with the rate limit, BEFORE any parsing work.
   if (!/^Rosu\//.test(a.userAgent)) return { status: 403, body: { ok: false, error: 'forbidden' } }
-  const parsed = parseCrash(a.raw)
-  if (!parsed.ok) return { status: 400, body: { ok: false, error: parsed.error } }
-  const { token, ...crash } = parsed.value
+  const token = typeof (a.raw as Record<string, unknown> | null)?.token === 'string'
+    ? (a.raw as Record<string, string>).token : ''
   if (!a.deps.appToken || !constantTimeEqual(token, a.deps.appToken)) return { status: 200, body: { ok: false, error: 'unauthorized' } }
   const rl = await a.deps.checkRateLimit()
   if (!rl.allowed) return { status: 429, body: { ok: false, error: rl.reason ?? 'rate_limited' } }
+  const parsed = parseCrash(a.raw)
+  if (!parsed.ok) return { status: 400, body: { ok: false, error: parsed.error } }
+  const { token: _t, ...crash } = parsed.value
+  void _t
   const fingerprint = crashFingerprint(crash)
   await a.deps.record({ ...crash, fingerprint })
   return { status: 200, body: { ok: true, fingerprint } }

@@ -4,7 +4,7 @@ import { handleCrash, CRASH_LIMITS_INPUT } from '@/lib/crash'
 import { checkRateLimit, CRASH_LIMITS } from '@/lib/ratelimit'
 import { getDb, recordCrash, recordRateEvent, countEventsSince, countAllEventsSince } from '@/lib/db'
 import { hashIp } from '@/lib/crypto'
-import { clientIp } from '@/lib/net'
+import { rateIp } from '@/lib/net'
 import { requireEnv } from '@/lib/env'
 export const runtime = 'nodejs'
 
@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
   try { raw = JSON.parse(text) } catch { return NextResponse.json({ ok: false, error: 'bad_json' }, { status: 400 }) }
   try {
     const sql = await getDb()
-    const ipHash = hashIp(clientIp(req), requireEnv('IP_HASH_SALT'))
+    // A crash-only hash ("crash:" input): it counts distinct users per crash and
+    // cannot be matched against the hashes stored with reports.
+    const ipHash = hashIp('crash:' + rateIp(req), requireEnv('IP_HASH_SALT'))
     const result = await handleCrash({
       raw, userAgent: req.headers.get('user-agent') || '',
       deps: {

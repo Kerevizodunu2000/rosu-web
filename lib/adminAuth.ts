@@ -31,8 +31,11 @@ export type LoginDeps = {
   totpSecret: string
   checkRateLimit: () => Promise<{ allowed: boolean; reason?: string }>
   failuresSince: (sinceIso: string) => Promise<{ count: number; last: string | null }>
+  /** Count one failed attempt for this address (feeds the lockout). */
+  recordFailure: () => Promise<void>
   claimTotpStep: (step: number) => Promise<boolean>
-  audit: (event: 'login_ok' | 'login_fail' | 'login_locked', detail?: string) => Promise<void>
+  /** Audit log entry (the route caps how many failures it writes per hour). */
+  audit: (event: 'login_ok' | 'login_fail', detail?: string) => Promise<void>
   startSession: () => Promise<{ token: string; maxAge: number }>
 }
 export type LoginResult = {
@@ -52,27 +55,21 @@ export async function handleLogin(input: { password: unknown; code: unknown }, d
 
   const recent = await deps.failuresSince(new Date(nowMs - LOCKOUT_LOOKBACK_MS).toISOString())
   const wait = lockoutRemaining(recent.count, recent.last, nowMs)
-  if (wait > 0) {
-    await deps.audit('login_locked', `retry_after=${wait}`)
-    return { status: 429, body: { ok: false, error: 'locked', retry_after: wait } }
+  // Not audited: a locked-out flood would only bury the real events.
+  if (wait > 0) return { status: 429, body: { ok: false, error: 'locked', retry_after: wait } }
+  const fail = async (detail: string): Promise<LoginResult> => {
+    await deps.recordFailure()
+    await deps.audit('login_fail', detail)
+    return { status: 401, body: { ok: false, error: 'invalid' } }
   }
 
   const password = typeof input.password === 'string' ? input.password : ''
   const code = typeof input.code === 'string' ? input.code.replace(/\s/g, '') : ''
-  if (!passwordOk(password, deps.adminPassword)) {
-    await deps.audit('login_fail', 'password')
-    return { status: 401, body: { ok: false, error: 'invalid' } }
-  }
+  if (!passwordOk(password, deps.adminPassword)) return fail('password')
   if (deps.totpSecret) {
     const step = verifyTotp(deps.totpSecret, code, nowMs)
-    if (step === null) {
-      await deps.audit('login_fail', code ? 'totp' : 'totp_missing')
-      return { status: 401, body: { ok: false, error: 'invalid' } }
-    }
-    if (!(await deps.claimTotpStep(step))) {
-      await deps.audit('login_fail', 'totp_replay')
-      return { status: 401, body: { ok: false, error: 'invalid' } }
-    }
+    if (step === null) return fail(code ? 'totp' : 'totp_missing')
+    if (!(await deps.claimTotpStep(step))) return fail('totp_replay')
   }
   const session = await deps.startSession()
   await deps.audit('login_ok', deps.totpSecret ? 'password+totp' : 'password')

@@ -2,29 +2,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SESSION_COOKIE, sessionCookieOptions } from '@/lib/session'
 import { requireAdmin } from '@/lib/adminGuard'
-import { insertAudit, revokeAdminSession, revokeAllAdminSessions } from '@/lib/db'
+import { insertAudit, revokeAdminSessionFamily, revokeAllAdminSessions } from '@/lib/db'
 import { hashIp } from '@/lib/crypto'
-import { clientIp } from '@/lib/net'
+import { rateIp } from '@/lib/net'
 export const runtime = 'nodejs'
 
-/** End this session, or with {"all": true} every admin session ("sign out everywhere"). */
+/**
+ * End this sign-in (every session rotated from it), or with {"all": true} every
+ * admin session ("sign out everywhere"). A database failure is reported (503),
+ * never answered with a reassuring "ok".
+ */
 export async function POST(req: NextRequest) {
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0))
   const admin = await requireAdmin(req)
-  if (admin instanceof NextResponse) return res // no live session: just clear the cookie
+  if (admin instanceof NextResponse) {
+    if (admin.status !== 401) return admin
+    // No live session: just make sure the browser forgets the cookie.
+    const res = NextResponse.json({ ok: true })
+    res.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0))
+    return res
+  }
   const body = await req.json().catch(() => ({})) as { all?: unknown }
-  const ipHash = hashIp('login:' + clientIp(req), process.env.IP_HASH_SALT || '')
+  const ipHash = hashIp('login:' + rateIp(req), process.env.IP_HASH_SALT || '')
   try {
     if (body?.all === true) {
       const n = await revokeAllAdminSessions(admin.sql)
       await insertAudit(admin.sql, 'logout_all', ipHash, `revoked=${n}`)
     } else {
-      await revokeAdminSession(admin.sql, admin.claims.sid)
+      await revokeAdminSessionFamily(admin.sql, admin.claims.family)
       await insertAudit(admin.sql, 'logout', ipHash)
     }
   } catch {
-    return NextResponse.json({ ok: false, error: 'server' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: 'unavailable' }, { status: 503 })
   }
+  const res = NextResponse.json({ ok: true })
+  res.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0))
   return res
 }

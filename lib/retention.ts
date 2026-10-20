@@ -46,17 +46,25 @@ export type RetentionDeps = {
   purgeEphemeral: (nowMs: number) => Promise<void>
 }
 
+/**
+ * Every purge runs on its own: a Drive outage must not stop the database
+ * purges (or the other way round). ``failures`` counts what did not complete;
+ * the cron reports a run with failures to the watchdog as failed.
+ */
 export async function runRetention(deps: RetentionDeps, nowMs = Date.now()):
   Promise<{ archivesDeleted: number; reportsDeleted: number; failures: number }> {
   const cutoff = retentionCutoff(nowMs)
   const beforeIso = cutoff.toISOString()
-  let archivesDeleted = 0, failures = 0
-  for (const f of expiredArchives(await deps.listArchives(), cutoff)) {
-    try { await deps.deleteArchive(f.id); archivesDeleted++ } catch { failures++ }
+  let archivesDeleted = 0, reportsDeleted = 0, failures = 0
+  try {
+    for (const f of expiredArchives(await deps.listArchives(), cutoff)) {
+      try { await deps.deleteArchive(f.id); archivesDeleted++ } catch { failures++ }
+    }
+  } catch { failures++ }
+  try { reportsDeleted = await deps.purgeReports(beforeIso) } catch { failures++ }
+  for (const step of [() => deps.purgeCrashes(beforeIso), () => deps.purgeAudit(beforeIso),
+                      () => deps.purgeEphemeral(nowMs)]) {
+    try { await step() } catch { failures++ }
   }
-  const reportsDeleted = await deps.purgeReports(beforeIso)
-  await deps.purgeCrashes(beforeIso)
-  await deps.purgeAudit(beforeIso)
-  await deps.purgeEphemeral(nowMs)
   return { archivesDeleted, reportsDeleted, failures }
 }
