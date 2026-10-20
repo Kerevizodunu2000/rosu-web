@@ -10,6 +10,22 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-20
+
+**Tools: free helpers that run in your browser.**
+
+### Added
+- **/tools** with two in-browser helpers; nothing is uploaded:
+  - **Missing pack checker** — drop your beatmap pack files (or paste their names) and see
+    which numbered osu!, mania, taiko and catch packs (S / SM / ST / SC) you are missing
+    between your lowest and highest, with links to each pack page and a copyable list.
+    The rules are the desktop app's gap detection; other series are listed, never guessed.
+  - **Library share card** — load a Rosu JSON export (Search → Export… → JSON) and download
+    a 1200×630 PNG with your set count, hours of music, hardest star rating, mania key
+    counts, modes and top artists.
+- "Tools" in the site navigation and the sitemap; both pages are in the e2e and
+  accessibility checks.
+
 ### Fixed
 Found by the v1.5 code and security review:
 - **Delete everywhere** now also deletes a screenshot whose status says "archived" while its

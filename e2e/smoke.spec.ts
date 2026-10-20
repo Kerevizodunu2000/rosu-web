@@ -21,6 +21,9 @@ const PAGES = [
   ['/status', /Status/i],
   ['/privacy', /Privacy/i],
   ['/terms', /Terms/i],
+  ['/tools', /Tools/i],
+  ['/tools/missing-packs', /pack/i],
+  ['/tools/share-card', /share card/i],
 ] as const
 
 for (const [path, heading] of PAGES) {
@@ -70,4 +73,23 @@ test('health endpoint reports the database honestly', async ({ request }) => {
   const res = await request.get('/api/health')
   expect([200, 503]).toContain(res.status())
   expect(await res.json()).toHaveProperty('db')
+})
+
+test('missing pack checker lists interior gaps from pasted names', async ({ page }) => {
+  await page.goto('/tools/missing-packs')
+  await page.getByText('…or paste a list of names').click()
+  await page.getByLabel('Pack file names, one per line').fill('S1 - a.zip\nS4 - b.zip\nSM7 - c.zip')
+  await page.getByRole('button', { name: 'Check the list' }).click()
+  await expect(page.getByRole('link', { name: 'S2' })).toHaveAttribute('href', 'https://osu.ppy.sh/beatmaps/packs/S2')
+  await expect(page.getByRole('link', { name: 'S3' })).toBeVisible()
+  await expectAccessible(page)
+})
+
+test('share card draws from a Rosu JSON export', async ({ page }) => {
+  await page.goto('/tools/share-card')
+  const json = JSON.stringify({ sets: [{ artist: 'Camellia', modes: ['osu!mania'], stars: [6.5], keys: [7], length_seconds: 200 }] })
+  await page.getByLabel('Rosu export (JSON)').setInputFiles({ name: 'export.json', mimeType: 'application/json', buffer: Buffer.from(json) })
+  await expect(page.getByRole('img', { name: /1 beatmap sets/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeEnabled()
+  await expectAccessible(page)
 })
