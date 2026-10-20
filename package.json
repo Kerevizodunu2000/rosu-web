@@ -14,16 +14,16 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "jose": "^6.2.3",
-    "jszip": "^3.10.1",
+    "@neondatabase/serverless": "^1.2.0",
+    "jose": "^6.2.12",
+    "jszip": "^3.10.2",
     "next": "^16.4.2",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.0",
-    "@playwright/test": "^1.56.1",
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.43",
     "@types/react": "^19",
