@@ -3,10 +3,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { lookupAdmin } from "@/lib/adminGuard";
 import { adminApiBase, adminPageBase, adminSlug } from "@/lib/adminPath";
-import { listRecentUnarchived, listRecentAll, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
+import { searchReports, statusCounts, reportStats, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
+import { likePattern, parseAdminQuery, PAGE_SIZE } from "@/lib/adminQuery";
 import LoginForm from "./login-form";
 import AdminTable from "@/components/AdminTable";
-import { AuditPanel, CrashPanel, SecurityPanel } from "@/components/AdminPanels";
+import { AuditPanel, CrashPanel, SecurityPanel, StatsPanel } from "@/components/AdminPanels";
 
 export const metadata: Metadata = {
   title: "Admin — Rosu",
@@ -31,7 +32,7 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const slug = adminSlug();
   const apiBase = adminApiBase(slug);
   const pageBase = adminPageBase(slug);
@@ -55,9 +56,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const view = (await searchParams).view === "all" ? "all" : "unarchived";
-  const [reports, audit, crashes, liveSessions] = await Promise.all([
-    view === "all" ? listRecentAll(admin.sql, 100) : listRecentUnarchived(admin.sql, 100),
+  const query = parseAdminQuery(await searchParams);
+  const exactId = /^#?\d{1,9}$/.test(query.q) ? Number(query.q.replace("#", "")) : null;
+  const [page, counts, stats, audit, crashes, liveSessions] = await Promise.all([
+    searchReports(admin.sql, {
+      unarchivedOnly: query.view === "unarchived", pattern: likePattern(query.q), exactId,
+      status: query.status, source: query.source, limit: PAGE_SIZE, offset: (query.page - 1) * PAGE_SIZE,
+    }),
+    statusCounts(admin.sql, query.view === "unarchived"),
+    reportStats(admin.sql),
     listAudit(admin.sql, 40),
     listCrashGroups(admin.sql, 50),
     countLiveAdminSessions(admin.sql),
@@ -66,7 +73,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <AdminChrome>
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-5 py-8 sm:px-8">
-        <AdminTable reports={reports} apiBase={apiBase} view={view} pageBase={pageBase} />
+        <AdminTable reports={page.rows} total={page.total} counts={counts} apiBase={apiBase}
+          query={query} pageBase={pageBase} />
+        <StatsPanel stats={stats} />
         <CrashPanel crashes={crashes} />
         <div className="grid gap-12 lg:grid-cols-2">
           <AuditPanel events={audit} />

@@ -52,3 +52,21 @@ export function parseStatusUpdate(raw: unknown):
   const note = typeof d.status_note === 'string' ? d.status_note.trim().slice(0, NOTE_MAX) : ''
   return { ok: true, value: { id, status, fixed_in, status_note: note || null } }
 }
+
+export const BULK_MAX = 100
+
+/** The same update for several reports (v1.5 bulk workflow): ``ids`` is 1–100
+ *  distinct positive ids; everything else is validated as in {@link parseStatusUpdate}. */
+export function parseBulkStatusUpdate(raw: unknown):
+  | { ok: true; value: { ids: number[]; status: ReportStatus; fixed_in: string | null; status_note: string | null } }
+  | { ok: false; error: string } {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, error: 'bad_json' }
+  const d = raw as Record<string, unknown>
+  if (!Array.isArray(d.ids) || d.ids.length === 0 || d.ids.length > BULK_MAX) return { ok: false, error: 'bad_ids' }
+  const ids = [...new Set(d.ids.map(Number))]
+  if (!ids.every((n) => Number.isSafeInteger(n) && n > 0)) return { ok: false, error: 'bad_ids' }
+  const one = parseStatusUpdate({ ...d, id: ids[0] })
+  if (!one.ok) return one
+  const { status, fixed_in, status_note } = one.value
+  return { ok: true, value: { ids, status, fixed_in, status_note } }
+}

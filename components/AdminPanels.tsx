@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Read-only admin panels (server-rendered): crash groups, the audit log, and a
-// security summary. Nothing here needs client state.
-import type { AuditRow, CrashGroup } from "@/lib/db";
+// Read-only admin panels (server-rendered): statistics, crash groups, the
+// audit log, and a security summary. Nothing here needs client state.
+import type { AuditRow, CrashGroup, ReportStatsRaw } from "@/lib/db";
+import { fillSeries, niceMax, type Bucket } from "@/lib/stats";
+import { STATUS_LABELS } from "@/lib/reportStatus";
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -100,6 +102,7 @@ const EVENT_LABELS: Record<AuditRow["event"], string> = {
   archive: "Archive run",
   status_change: "Status changed",
   maintenance: "Retention sweep",
+  dsar_delete: "Report deleted (data request)",
 };
 
 export function AuditPanel({ events }: { events: AuditRow[] }) {
@@ -120,6 +123,111 @@ export function AuditPanel({ events }: { events: AuditRow[] }) {
             </li>
           ))}
         </ol>
+      )}
+    </Panel>
+  );
+}
+
+// ── statistics (v1.5) ─────────────────────────────────────────────────────────
+
+const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
+
+function StatTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="card flex flex-col gap-1 px-5 py-4">
+      <span className="text-xs font-medium text-fg-muted">{label}</span>
+      <span className="text-2xl font-semibold tabular-nums tracking-tight text-fg">{compact(value)}</span>
+    </div>
+  );
+}
+
+/**
+ * A single-series column chart: thin columns (≤24px) with a 4px rounded top
+ * on one baseline, a recessive hairline axis, only the peak labelled, and a
+ * native tooltip on a hit area wider than the column. The numbers are also in
+ * the table under the chart.
+ */
+function ColumnChart({ title, series, label }: { title: string; series: Bucket[]; label: (key: string) => string }) {
+  const W = 560, H = 150, top = 20, bottom = 22
+  const max = niceMax(Math.max(0, ...series.map((b) => b.n)))
+  const slot = W / series.length
+  const barW = Math.min(24, slot - 2)
+  const plotH = H - top - bottom
+  const peak = series.reduce((best, b, i) => (b.n > series[best].n ? i : best), 0)
+  return (
+    <figure className="card flex flex-col gap-2 px-5 py-4">
+      <figcaption className="text-sm font-medium text-fg">{title}</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={title}>
+        <line x1={0} x2={W} y1={H - bottom + 0.5} y2={H - bottom + 0.5} stroke="var(--border)" strokeWidth={1} />
+        {series.map((b, i) => {
+          const h = b.n ? Math.max(2, (b.n / max) * plotH) : 0
+          const x = i * slot + (slot - barW) / 2
+          const y = H - bottom - h
+          const r = Math.min(4, h, barW / 2)
+          const d = `M${x},${H - bottom} V${y + r} Q${x},${y} ${x + r},${y} H${x + barW - r} Q${x + barW},${y} ${x + barW},${y + r} V${H - bottom} Z`
+          return (
+            <g key={b.key}>
+              <title>{`${label(b.key)}: ${b.n}`}</title>
+              <rect x={i * slot} y={top} width={slot} height={plotH} fill="transparent" />
+              {h > 0 && <path d={d} fill="var(--chart-mark)" />}
+              {i === peak && b.n > 0 && (
+                <text x={x + barW / 2} y={y - 6} textAnchor="middle" className="fill-fg text-[11px] tabular-nums">{b.n}</text>
+              )}
+            </g>
+          )
+        })}
+        <text x={0} y={H - 6} className="fill-fg-muted text-[11px]">{label(series[0].key)}</text>
+        <text x={W} y={H - 6} textAnchor="end" className="fill-fg-muted text-[11px]">{label(series[series.length - 1].key)}</text>
+      </svg>
+      <details className="text-xs text-fg-muted">
+        <summary className="cursor-pointer">Show as a table</summary>
+        <table className="mt-2 w-full text-left tabular-nums">
+          <tbody>
+            {series.map((b) => (
+              <tr key={b.key}><td className="py-0.5 pr-4">{label(b.key)}</td><td className="py-0.5 text-fg">{b.n}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </figure>
+  );
+}
+
+const dayLabel = (key: string) =>
+  new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
+export function StatsPanel({ stats, now = new Date() }: { stats: ReportStatsRaw; now?: Date }) {
+  const s = stats.byStatus;
+  const total = s.received + s.in_review + s.fixed + s.closed;
+  const weeks = fillSeries(stats.perWeek, "week", 12, now);
+  const days = fillSeries(stats.crashesPerDay, "day", 14, now);
+  const crashes = days.reduce((a, b) => a + b.n, 0);
+  const vmax = Math.max(1, ...stats.versions.map((v) => v.n));
+  return (
+    <Panel title="Statistics" subtitle={`${stats.bySource.app} from the app · ${stats.bySource.web} from the web form`}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Reports" value={total} />
+        <StatTile label="Open (received or in review)" value={s.received + s.in_review} />
+        <StatTile label={STATUS_LABELS.fixed} value={s.fixed} />
+        <StatTile label="Crash reports, last 14 days" value={crashes} />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ColumnChart title="Reports per week (12 weeks, by week start)" series={weeks} label={(k) => `w/c ${dayLabel(k)}`} />
+        <ColumnChart title="Crash reports per day (14 days)" series={days} label={dayLabel} />
+      </div>
+      {stats.versions.length > 0 && (
+        <div className="card flex flex-col gap-2 px-5 py-4">
+          <p className="text-sm font-medium text-fg">Reports by app version (top {stats.versions.length})</p>
+          <ul className="flex flex-col gap-1.5 text-xs">
+            {stats.versions.map((v) => (
+              <li key={v.version} className="grid grid-cols-[6rem_1fr_3rem] items-center gap-3">
+                <span className="truncate font-mono text-fg-muted" title={v.version}>{v.version}</span>
+                <span className="h-2.5 rounded-r-[4px] bg-[var(--chart-mark)]" style={{ width: `${(v.n / vmax) * 100}%` }} />
+                <span className="text-right tabular-nums text-fg">{v.n}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </Panel>
   );

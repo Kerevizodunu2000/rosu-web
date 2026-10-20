@@ -75,13 +75,13 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 | `/privacy` | Privacy Policy — bilingual (EN + TR) |
 | `/terms` | Terms — bilingual (EN + TR) |
 | `/report/status/<token>` | A reporter's private status page (no account) |
-| `/admin` | Submissions, status updates, crash groups, activity log (password + optional TOTP; can live under a secret `ADMIN_PATH`) |
+| `/admin` | Submissions with search, filters and pages, single and bulk status updates, one-click "delete everywhere" for data requests, statistics, crash groups, activity log (password + optional TOTP; can live under a secret `ADMIN_PATH`) |
 | `POST /api/report` | Accepts the desktop app **and** the web form; returns `{ ok, id, status_url }` |
 | `POST /api/crash` | Opt-in crash fingerprints from the desktop app (token + rate limit, scrubbed server-side) |
 | `GET /api/health` | `{ ok, db }` for uptime monitors (503 when the database is down) |
 | `GET /api/latest-version` | Latest desktop release (version, download + SHA-256 URLs, notes) for the in-app update check; CDN-cached |
 | `GET /api/cron/archive` | Nightly job: archive → 12-month retention → watchdog ping (Vercel Cron) |
-| `POST /api/admin/{login,logout,archive,status}` | Admin session, manual archive, report status |
+| `POST /api/admin/{login,logout,archive,status,delete}` | Admin session, manual archive, report status (one or up to 100 at once), delete a report everywhere (row + Drive screenshot + its archive entry) |
 | `GET /api/admin/image/[id]` | Auth-gated Drive image proxy (never a public URL) |
 
 ## Local development

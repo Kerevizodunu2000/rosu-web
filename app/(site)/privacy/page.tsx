@@ -111,7 +111,8 @@ export default function PrivacyPage() {
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent-2 underline underline-offset-2">
             {CONTACT_EMAIL}
           </a>
-          . If you&apos;re in the EU/EEA or the UK, you also have the right to lodge a complaint with
+          . A deletion covers every copy we hold: the report itself, its screenshot, and its entry in
+          our archive. If you&apos;re in the EU/EEA or the UK, you also have the right to lodge a complaint with
           your local data-protection authority; in Turkey you may complain to the Personal Data
           Protection Authority (KVKK).
         </PolicyBlock>
@@ -210,7 +211,8 @@ export default function PrivacyPage() {
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent-2 underline underline-offset-2">
             {CONTACT_EMAIL}
           </a>{" "}
-          adresine e-posta gönderebilirsin. AB/AEA veya Birleşik Krallık&apos;taysan yerel veri koruma
+          adresine e-posta gönderebilirsin. Silme, elimizdeki her kopyayı kapsar: raporun kendisi, ekran
+          görüntüsü ve arşivdeki kaydı. AB/AEA veya Birleşik Krallık&apos;taysan yerel veri koruma
           otoritene şikâyette bulunma hakkın da vardır; Türkiye&apos;de Kişisel Verileri Koruma
           Kurumu&apos;na (KVKK) şikâyette bulunabilirsin.
         </PolicyBlock>

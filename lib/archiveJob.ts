@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { runArchive } from './archiveService'
 import { runRetention } from './retention'
+import { deleteReportEverywhere, type DsarResult } from './dsar'
 import { DriveClient } from './drive'
 import {
   getDb, listUnarchived, markArchived, pruneRateEvents, purgeArchivedReportsBefore,
   purgeCrashesBefore, purgeAuditBefore, purgeAdminSessions, purgeTotpSteps, insertAudit,
+  listReportById, deleteReportRow, type Sql,
 } from './db'
 import { requireEnv } from './env'
 
@@ -80,4 +82,19 @@ export async function runRetentionJob(): Promise<{ archivesDeleted: number; repo
       (result.failures ? `, ${result.failures} archive deletion(s) failed` : ''))
   }
   return result
+}
+
+/** The DSAR delete (lib/dsar.ts) wired to the real Drive folder layout. */
+export async function runDsarDelete(sql: Sql, id: number): Promise<DsarResult> {
+  const drive = driveFromEnv()
+  const archivesFolder = async () => drive.ensureFolder('Archives', await drive.ensureFolder(rootName()))
+  return deleteReportEverywhere({
+    getReport: (rid) => listReportById(sql, rid),
+    deleteDriveFile: (fileId) => drive.deleteFile(fileId),
+    findArchives: async (name) => (await drive.listFolder(await archivesFolder())).filter((f) => f.name === name),
+    downloadFile: (fileId) => drive.downloadFile(fileId),
+    uploadArchive: async (name, bytes) =>
+      drive.uploadFile({ name, mimeType: 'application/zip', bytes, parent: await archivesFolder() }),
+    deleteReportRow: (rid) => deleteReportRow(sql, rid),
+  }, id)
 }

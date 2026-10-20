@@ -75,6 +75,45 @@ export async function listRecentAll(sql: Sql, limit: number): Promise<ReportReco
   const rows = await sql`SELECT * FROM reports ORDER BY created_at DESC LIMIT ${limit}` as Record<string, unknown>[]
   return rows.map(normalizeReport)
 }
+/**
+ * One page of the admin list (v1.5): optional text search (title, description,
+ * contact or the exact id), status, source and unarchived-only filters. One
+ * static statement — the filters are bound parameters that are simply NULL
+ * when unused. ``pattern`` comes from adminQuery.likePattern, whose backslash
+ * escapes are ILIKE's default escape character. Returns the page plus the
+ * total number of matches.
+ */
+export async function searchReports(sql: Sql, f: {
+  unarchivedOnly: boolean; pattern: string | null; exactId: number | null
+  status: ReportStatus | null; source: 'app' | 'web' | null; limit: number; offset: number
+}): Promise<{ rows: ReportRecord[]; total: number }> {
+  const [rows, count] = await Promise.all([
+    sql`SELECT * FROM reports
+      WHERE (${f.unarchivedOnly}::boolean IS NOT TRUE OR archived_at IS NULL)
+        AND (${f.status}::text IS NULL OR status = ${f.status})
+        AND (${f.source}::text IS NULL OR source = ${f.source})
+        AND (${f.pattern}::text IS NULL OR title ILIKE ${f.pattern}
+             OR description ILIKE ${f.pattern} OR contact ILIKE ${f.pattern}
+             OR id = ${f.exactId})
+      ORDER BY created_at DESC, id DESC LIMIT ${f.limit} OFFSET ${f.offset}`,
+    sql`SELECT count(*)::int AS n FROM reports
+      WHERE (${f.unarchivedOnly}::boolean IS NOT TRUE OR archived_at IS NULL)
+        AND (${f.status}::text IS NULL OR status = ${f.status})
+        AND (${f.source}::text IS NULL OR source = ${f.source})
+        AND (${f.pattern}::text IS NULL OR title ILIKE ${f.pattern}
+             OR description ILIKE ${f.pattern} OR contact ILIKE ${f.pattern}
+             OR id = ${f.exactId})`,
+  ]) as [Record<string, unknown>[], { n: number }[]]
+  return { rows: rows.map(normalizeReport), total: Number(count[0]?.n ?? 0) }
+}
+/** How many reports are in each status (unarchived only, or all). */
+export async function statusCounts(sql: Sql, unarchivedOnly: boolean): Promise<Record<ReportStatus, number>> {
+  const rows = await sql`SELECT status, count(*)::int AS n FROM reports
+    WHERE (${unarchivedOnly}::boolean IS NOT TRUE OR archived_at IS NULL) GROUP BY status` as { status: string; n: number }[]
+  const out = { received: 0, in_review: 0, fixed: 0, closed: 0 } as Record<ReportStatus, number>
+  for (const r of rows) if ((REPORT_STATUSES as readonly string[]).includes(r.status)) out[r.status as ReportStatus] = Number(r.n)
+  return out
+}
 export async function listReportById(sql: Sql, id: number): Promise<ReportRecord | null> {
   const rows = await sql`SELECT * FROM reports WHERE id = ${id}` as Record<string, unknown>[]
   return rows[0] ? normalizeReport(rows[0]) : null
@@ -88,6 +127,20 @@ export async function setReportStatus(sql: Sql, id: number, v: {
 }): Promise<boolean> {
   const rows = await sql`UPDATE reports SET status = ${v.status}, fixed_in = ${v.fixed_in},
     status_note = ${v.status_note}, status_updated_at = now() WHERE id = ${id} RETURNING id` as { id: number }[]
+  return rows.length > 0
+}
+/** The same public status for several reports at once (v1.5 bulk workflow). */
+export async function setReportStatusMany(sql: Sql, ids: number[], v: {
+  status: ReportStatus; fixed_in: string | null; status_note: string | null
+}): Promise<number[]> {
+  if (!ids.length) return []
+  const rows = await sql`UPDATE reports SET status = ${v.status}, fixed_in = ${v.fixed_in},
+    status_note = ${v.status_note}, status_updated_at = now() WHERE id = ANY(${ids}) RETURNING id` as { id: number }[]
+  return rows.map((r) => Number(r.id))
+}
+/** Delete one report row (the DSAR flow removes its Drive copies first). */
+export async function deleteReportRow(sql: Sql, id: number): Promise<boolean> {
+  const rows = await sql`DELETE FROM reports WHERE id = ${id} RETURNING id` as { id: number }[]
   return rows.length > 0
 }
 export async function listUnarchived(sql: Sql): Promise<ReportRecord[]> {
@@ -108,6 +161,38 @@ export async function markArchived(sql: Sql, ids: number[], archiveRef: string):
 export async function purgeArchivedReportsBefore(sql: Sql, beforeIso: string): Promise<number> {
   const rows = await sql`DELETE FROM reports WHERE archived_at IS NOT NULL AND created_at < ${beforeIso} RETURNING id` as { id: number }[]
   return rows.length
+}
+
+// ── admin statistics (v1.5) ───────────────────────────────────────────────────
+
+export type ReportStatsRaw = {
+  byStatus: Record<ReportStatus, number>
+  bySource: { app: number; web: number }
+  perWeek: { key: string; n: number }[]
+  versions: { version: string; n: number }[]
+  crashesPerDay: { key: string; n: number }[]
+}
+/** Counts behind the admin stats panel: buckets are UTC days / ISO weeks. */
+export async function reportStats(sql: Sql): Promise<ReportStatsRaw> {
+  const [status, source, weeks, versions, crashes] = await Promise.all([
+    statusCounts(sql, false),
+    sql`SELECT source, count(*)::int AS n FROM reports GROUP BY source`,
+    sql`SELECT to_char(date_trunc('week', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS key,
+          count(*)::int AS n FROM reports WHERE created_at > now() - interval '13 weeks' GROUP BY 1`,
+    sql`SELECT app_version AS version, count(*)::int AS n FROM reports
+          WHERE app_version IS NOT NULL AND app_version <> '' GROUP BY 1 ORDER BY n DESC, 1 DESC LIMIT 6`,
+    sql`SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS key,
+          count(*)::int AS n FROM crash_events WHERE created_at > now() - interval '15 days' GROUP BY 1`,
+  ]) as [Record<ReportStatus, number>, { source: string; n: number }[], { key: string; n: number }[],
+         { version: string; n: number }[], { key: string; n: number }[]]
+  const bySource = { app: 0, web: 0 }
+  for (const r of source) if (r.source === 'app' || r.source === 'web') bySource[r.source] = Number(r.n)
+  return {
+    byStatus: status, bySource,
+    perWeek: weeks.map((r) => ({ key: String(r.key), n: Number(r.n) })),
+    versions: versions.map((r) => ({ version: String(r.version), n: Number(r.n) })),
+    crashesPerDay: crashes.map((r) => ({ key: String(r.key), n: Number(r.n) })),
+  }
 }
 
 // ── rate limiting ─────────────────────────────────────────────────────────────
@@ -170,7 +255,7 @@ export async function purgeAdminSessions(sql: Sql, beforeIso: string): Promise<v
 
 export type AuditEvent =
   | 'login_ok' | 'login_fail' | 'logout' | 'logout_all'
-  | 'archive' | 'status_change' | 'maintenance'
+  | 'archive' | 'status_change' | 'maintenance' | 'dsar_delete'
 export type AuditRow = { id: number; at: string; event: AuditEvent; ip_hash: string | null; detail: string | null }
 
 export async function insertAudit(sql: Sql, event: AuditEvent, ipHash: string | null, detail: string | null = null): Promise<void> {

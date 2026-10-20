@@ -10,6 +10,30 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-20
+
+**Admin Panel Pro.**
+
+### Added
+- **Search, filters and pages** in the admin list: text search over title, description,
+  contact e-mail or `#id`; status (with counts) and source filters; 50 reports per page
+  with newer/older links. The URL holds the state, so a filtered view survives a reload.
+  The old 100-row cap is gone.
+- **Bulk status**: tick reports (or the whole page) and set one status — with "fixed in"
+  — for up to 100 at once. `POST /api/admin/status` accepts `ids` alongside `id`.
+- **Delete everywhere** (data-subject requests): one action removes a report's database
+  row, its screenshot in Drive and its entry in the Drive archive it went into (the
+  archive is rewritten without it, or deleted when it was the last report). Drive goes
+  first, so a failure keeps the row for a retry; "already gone" is not an error; the
+  admin types the report id to confirm; the audit log records the id only.
+  `POST /api/admin/delete`.
+- **Statistics**: reports total / open / fixed and crash reports in the last 14 days;
+  reports per week (12 weeks) and crash reports per day (14 days) as column charts with
+  a table view; reports by app version.
+
+### Changed
+- `/privacy` says that a deletion covers every copy (report, screenshot, archive entry).
+
 ## [1.4.0] - 2026-10-20
 
 Quality & visibility release.
