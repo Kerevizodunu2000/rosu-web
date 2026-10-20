@@ -61,6 +61,7 @@
   --color-fg-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-rose: var(--accent-rose);
   --color-on-accent: var(--on-accent);
   --font-sans: var(--font-geist-sans);

@@ -49,6 +49,7 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
       const archives = await drive.ensureFolder('Archives', root)
       return drive.uploadFile({ name, mimeType: 'application/zip', bytes, parent: archives })
     },
+    deleteArchive: (fileId) => drive.deleteFile(fileId),
     markArchived: (ids, ref) => markArchived(sql, ids, ref),
     deleteImage: (id) => drive.deleteFile(id),
   }, today)
@@ -84,17 +85,20 @@ export async function runRetentionJob(): Promise<{ archivesDeleted: number; repo
   return result
 }
 
-/** The DSAR delete (lib/dsar.ts) wired to the real Drive folder layout. */
+/** The DSAR delete (lib/dsar.ts) wired to the real Drive folder layout. The
+ *  Drive client is only built when a step needs it, so a report with nothing
+ *  in Drive can be deleted even while the Drive settings are missing. */
 export async function runDsarDelete(sql: Sql, id: number): Promise<DsarResult> {
-  const drive = driveFromEnv()
-  const archivesFolder = async () => drive.ensureFolder('Archives', await drive.ensureFolder(rootName()))
+  let client: DriveClient | null = null
+  const drive = () => (client ??= driveFromEnv())
+  const archivesFolder = async () => drive().ensureFolder('Archives', await drive().ensureFolder(rootName()))
   return deleteReportEverywhere({
     getReport: (rid) => listReportById(sql, rid),
-    deleteDriveFile: (fileId) => drive.deleteFile(fileId),
-    findArchives: async (name) => (await drive.listFolder(await archivesFolder())).filter((f) => f.name === name),
-    downloadFile: (fileId) => drive.downloadFile(fileId),
+    deleteDriveFile: (fileId) => drive().deleteFile(fileId),
+    findArchives: async (name) => (await drive().listFolder(await archivesFolder())).filter((f) => f.name === name),
+    downloadFile: (fileId) => drive().downloadFile(fileId),
     uploadArchive: async (name, bytes) =>
-      drive.uploadFile({ name, mimeType: 'application/zip', bytes, parent: await archivesFolder() }),
-    deleteReportRow: (rid) => deleteReportRow(sql, rid),
+      drive().uploadFile({ name, mimeType: 'application/zip', bytes, parent: await archivesFolder() }),
+    deleteReportRow: (rid, ref) => deleteReportRow(sql, rid, ref),
   }, id)
 }

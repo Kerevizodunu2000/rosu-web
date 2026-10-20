@@ -33,13 +33,26 @@ export async function buildReportsZip(entries: Entry[]): Promise<Uint8Array> {
  * the archive never held it; ``remaining`` is how many reports are left (zero
  * means the caller should delete the archive rather than keep an empty one).
  */
+/** An archive whose ZIP or reports.json cannot be read, so a report cannot be taken out of it. */
+export class UnreadableArchiveError extends Error {
+  constructor() { super('archive_unreadable') }
+}
+
 export async function removeReportFromZip(bytes: Uint8Array, id: number, imageName: string | null):
   Promise<{ bytes: Uint8Array; removed: boolean; remaining: number }> {
-  const zip = await JSZip.loadAsync(bytes)
-  const json = zip.file('reports.json')
-  if (!json) return { bytes, removed: false, remaining: -1 }
-  const parsed = JSON.parse(await json.async('string')) as unknown
-  const reports = Array.isArray(parsed) ? (parsed as ZipReport[]) : []
+  let zip: JSZip
+  let parsed: unknown
+  try {
+    zip = await JSZip.loadAsync(bytes)
+    const json = zip.file('reports.json')
+    if (!json) return { bytes, removed: false, remaining: -1 }
+    parsed = JSON.parse(await json.async('string'))
+  } catch {
+    throw new UnreadableArchiveError()
+  }
+  // Never guess: an archive whose list is not a list may still hold the report.
+  if (!Array.isArray(parsed)) throw new UnreadableArchiveError()
+  const reports = parsed as ZipReport[]
   const kept = reports.filter((r) => Number(r?.id) !== id)
   const image = imageName ? zip.file(`images/${imageName}`) : null
   if (kept.length === reports.length && !image) return { bytes, removed: false, remaining: reports.length }

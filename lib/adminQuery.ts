@@ -23,7 +23,8 @@ export function parseAdminQuery(params: Record<string, unknown>): AdminQuery {
   const page = Number(one(params.page))
   return {
     view: one(params.view) === 'all' ? 'all' : 'unarchived',
-    q: one(params.q).replace(/\s+/g, ' ').trim().slice(0, Q_MAX),
+    // Control characters (NUL above all — Postgres rejects it in text) are dropped.
+    q: one(params.q).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, Q_MAX),
     status: REPORT_STATUSES.includes(status) ? status : null,
     source: source === 'app' || source === 'web' ? source : null,
     page: Number.isSafeInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
@@ -50,4 +51,9 @@ export function likePattern(q: string): string | null {
 
 export function pageCount(total: number): number {
   return Math.max(1, Math.ceil(total / PAGE_SIZE))
+}
+
+/** ``page`` within the pages that exist for ``total`` results. */
+export function clampPage(page: number, total: number): number {
+  return Math.min(Math.max(1, page), pageCount(total))
 }

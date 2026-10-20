@@ -10,6 +10,38 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+### Fixed
+Found by the v1.5 code and security review:
+- **Delete everywhere** now also deletes a screenshot whose status says "archived" while its
+  Drive file id is still set.
+- **A rewritten archive escaped the 12-month retention**: the retention sweep read the
+  Drive creation time, which a rewrite resets. It now goes by the date in the archive's
+  name (an archive dated D only holds reports created by the end of D). Archives are
+  never updated in place, because Drive would keep the old content as a revision.
+- **Delete everywhere vs. the nightly archive**: the row is deleted only while its archive
+  reference is still the one that was cleaned (otherwise the new archive is cleaned
+  first), and the archive job takes a report that was deleted while its ZIP was being
+  built back out of that ZIP. An archive upload whose reports could not be marked is
+  deleted again, so a report is never in two archives.
+- Bulk status kept no public note or "fixed in" version: each report now keeps its own
+  unless a new one is given.
+- A report's status cell could show stale values after a save or a bulk change.
+- The delete route requires a JSON body whose `confirm` is exactly the id (a number or a
+  string of digits); failed deletions are written to the activity log too, and a failing
+  audit write no longer turns a finished deletion into an error. Drive settings are only
+  needed when a report has something in Drive.
+- An unreadable archive stops the deletion with a clear message instead of a generic
+  Drive error; an archive that is already gone is skipped.
+- Admin list: control characters are removed from the search; a page past the end shows
+  the last page; the status menu's counts follow the other filters.
+- Admin panel: clearer error messages, a label on every delete button, link colors with
+  enough contrast for small text, UTC in chart titles, a message when a chart has
+  nothing to show, a visible chart baseline, and one status-count query fewer.
+
+### Changed
+- `/privacy` describes a deletion precisely (database row, screenshot, archive entry;
+  Drive deletions are permanent) instead of promising "every copy".
+
 ## [1.5.0] - 2026-10-20
 
 **Admin Panel Pro.**

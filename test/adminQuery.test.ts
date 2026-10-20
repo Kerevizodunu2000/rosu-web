@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test, expect } from 'vitest'
-import { adminHref, likePattern, pageCount, parseAdminQuery, PAGE_SIZE, Q_MAX } from '@/lib/adminQuery'
+import { adminHref, clampPage, likePattern, pageCount, parseAdminQuery, PAGE_SIZE, Q_MAX } from '@/lib/adminQuery'
 
 test('the admin URL state is parsed strictly', () => {
   expect(parseAdminQuery({})).toEqual({ view: 'unarchived', q: '', status: null, source: null, page: 1 })
@@ -24,6 +24,16 @@ test('links keep the filters and drop defaults', () => {
 test('ILIKE patterns take the user’s wildcards literally', () => {
   expect(likePattern('')).toBeNull()
   expect(likePattern('50%_off\\')).toBe('%50\\%\\_off\\\\%')
+})
+
+test('control characters never reach the query', () => {
+  expect(parseAdminQuery({ q: 'a\u0000b\u0007c\u007f d' }).q).toBe('a b c d')
+})
+
+test('a page past the end is clamped to the last one', () => {
+  expect(clampPage(9, 0)).toBe(1)
+  expect(clampPage(9, PAGE_SIZE * 2 + 1)).toBe(3)
+  expect(clampPage(2, PAGE_SIZE * 2 + 1)).toBe(2)
 })
 
 test('page count', () => {

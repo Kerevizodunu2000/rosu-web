@@ -72,7 +72,7 @@ export function CrashPanel({ crashes }: { crashes: CrashGroup[] }) {
                     <p className="font-mono text-xs font-semibold text-fg">{c.exc_type}</p>
                     {c.message && <p className="mt-1 max-w-xl text-xs text-fg-muted">{c.message}</p>}
                     <details className="mt-1.5">
-                      <summary className="cursor-pointer text-xs text-accent-2">Stack ({c.frames.split("\n").length} frames)</summary>
+                      <summary className="cursor-pointer text-xs text-accent-ink">Stack ({c.frames.split("\n").length} frames)</summary>
                       <pre className="mt-1.5 max-w-xl overflow-x-auto whitespace-pre font-mono text-[11px] leading-relaxed text-fg-muted">{c.frames}</pre>
                     </details>
                     <p className="mt-1 font-mono text-[10px] text-fg-muted/70">{c.fingerprint}</p>
@@ -103,6 +103,7 @@ const EVENT_LABELS: Record<AuditRow["event"], string> = {
   status_change: "Status changed",
   maintenance: "Retention sweep",
   dsar_delete: "Report deleted (data request)",
+  dsar_failed: "Data-request deletion failed",
 };
 
 export function AuditPanel({ events }: { events: AuditRow[] }) {
@@ -115,7 +116,7 @@ export function AuditPanel({ events }: { events: AuditRow[] }) {
           {events.map((e) => (
             <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
               <time dateTime={e.at} className="font-mono text-xs tabular-nums text-fg-muted">{when(e.at)}</time>
-              <span className={e.event === "login_fail" ? "font-medium text-accent-rose" : "font-medium text-fg"}>
+              <span className={e.event === "login_fail" || e.event === "dsar_failed" ? "font-medium text-accent-rose" : "font-medium text-fg"}>
                 {EVENT_LABELS[e.event] ?? e.event}
               </span>
               {e.detail && <span className="text-xs text-fg-muted">{e.detail}</span>}
@@ -154,11 +155,22 @@ function ColumnChart({ title, series, label }: { title: string; series: Bucket[]
   const barW = Math.min(24, slot - 2)
   const plotH = H - top - bottom
   const peak = series.reduce((best, b, i) => (b.n > series[best].n ? i : best), 0)
+  if (series.every((b) => b.n === 0)) {
+    return (
+      <figure className="card flex flex-col gap-2 px-5 py-4">
+        <figcaption className="text-sm font-medium text-fg">{title}</figcaption>
+        <p className="py-10 text-center text-sm text-fg-muted">
+          Nothing in this period ({label(series[0].key)} – {label(series[series.length - 1].key)}).
+        </p>
+      </figure>
+    )
+  }
   return (
     <figure className="card flex flex-col gap-2 px-5 py-4">
       <figcaption className="text-sm font-medium text-fg">{title}</figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={title}>
-        <line x1={0} x2={W} y1={H - bottom + 0.5} y2={H - bottom + 0.5} stroke="var(--border)" strokeWidth={1} />
+        <line x1={0} x2={W} y1={H - bottom + 0.5} y2={H - bottom + 0.5} stroke="var(--text-muted)"
+          strokeOpacity={0.6} strokeWidth={1} />
         {series.map((b, i) => {
           const h = b.n ? Math.max(2, (b.n / max) * plotH) : 0
           const x = i * slot + (slot - barW) / 2
@@ -209,11 +221,12 @@ export function StatsPanel({ stats, now = new Date() }: { stats: ReportStatsRaw;
         <StatTile label="Reports" value={total} />
         <StatTile label="Open (received or in review)" value={s.received + s.in_review} />
         <StatTile label={STATUS_LABELS.fixed} value={s.fixed} />
-        <StatTile label="Crash reports, last 14 days" value={crashes} />
+        <StatTile label="Crash reports, last 14 days (UTC)" value={crashes} />
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        <ColumnChart title="Reports per week (12 weeks, by week start)" series={weeks} label={(k) => `w/c ${dayLabel(k)}`} />
-        <ColumnChart title="Crash reports per day (14 days)" series={days} label={dayLabel} />
+        <ColumnChart title="Reports per week (12 weeks, weeks start Monday, UTC)" series={weeks}
+          label={(k) => `w/c ${dayLabel(k)}`} />
+        <ColumnChart title="Crash reports per day (14 days, UTC)" series={days} label={dayLabel} />
       </div>
       {stats.versions.length > 0 && (
         <div className="card flex flex-col gap-2 px-5 py-4">

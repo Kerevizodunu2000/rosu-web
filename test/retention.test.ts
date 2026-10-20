@@ -15,9 +15,10 @@ test('only our own archive names past the cutoff are selected', () => {
     { id: '2', name: 'rosu-reports-20251020.zip' },                // same day as cutoff: its day is not over
     { id: '3', name: 'rosu-reports-20260101.zip' },                // recent
     { id: '4', name: 'something-else.zip' },                       // not ours
-    { id: '5', name: 'rosu-reports-20250101.zip', createdTime: '2026-03-01T00:00:00Z' }, // re-uploaded later: keep
+    // Rewritten later (a report taken out for a deletion request): the name's date still decides.
+    { id: '5', name: 'rosu-reports-20250101.zip', createdTime: '2026-03-01T00:00:00Z' },
   ]
-  expect(expiredArchives(files, cutoff).map((f) => f.id)).toEqual(['1'])
+  expect(expiredArchives(files, cutoff).map((f) => f.id)).toEqual(['1', '5'])
 })
 
 test('runRetention deletes, purges and counts failures without stopping', async () => {

@@ -106,10 +106,20 @@ export async function searchReports(sql: Sql, f: {
   ]) as [Record<string, unknown>[], { n: number }[]]
   return { rows: rows.map(normalizeReport), total: Number(count[0]?.n ?? 0) }
 }
-/** How many reports are in each status (unarchived only, or all). */
-export async function statusCounts(sql: Sql, unarchivedOnly: boolean): Promise<Record<ReportStatus, number>> {
+/** How many reports are in each status, within the other filters (view,
+ *  text, source) — so the status menu's numbers match what picking one shows.
+ *  With no filters, the whole table. */
+export async function statusCounts(sql: Sql, f: {
+  unarchivedOnly: boolean; pattern?: string | null; exactId?: number | null; source?: 'app' | 'web' | null
+} = { unarchivedOnly: false }): Promise<Record<ReportStatus, number>> {
+  const pattern = f.pattern ?? null, exactId = f.exactId ?? null, source = f.source ?? null
   const rows = await sql`SELECT status, count(*)::int AS n FROM reports
-    WHERE (${unarchivedOnly}::boolean IS NOT TRUE OR archived_at IS NULL) GROUP BY status` as { status: string; n: number }[]
+    WHERE (${f.unarchivedOnly}::boolean IS NOT TRUE OR archived_at IS NULL)
+      AND (${source}::text IS NULL OR source = ${source})
+      AND (${pattern}::text IS NULL OR title ILIKE ${pattern}
+           OR description ILIKE ${pattern} OR contact ILIKE ${pattern}
+           OR id = ${exactId})
+    GROUP BY status` as { status: string; n: number }[]
   const out = { received: 0, in_review: 0, fixed: 0, closed: 0 } as Record<ReportStatus, number>
   for (const r of rows) if ((REPORT_STATUSES as readonly string[]).includes(r.status)) out[r.status as ReportStatus] = Number(r.n)
   return out
@@ -129,18 +139,25 @@ export async function setReportStatus(sql: Sql, id: number, v: {
     status_note = ${v.status_note}, status_updated_at = now() WHERE id = ${id} RETURNING id` as { id: number }[]
   return rows.length > 0
 }
-/** The same public status for several reports at once (v1.5 bulk workflow). */
+/** The same public status for several reports at once (v1.5 bulk workflow).
+ *  Each report keeps its own note unless a new one is given, and its "fixed
+ *  in" version while it stays fixed and none is given. */
 export async function setReportStatusMany(sql: Sql, ids: number[], v: {
   status: ReportStatus; fixed_in: string | null; status_note: string | null
 }): Promise<number[]> {
   if (!ids.length) return []
-  const rows = await sql`UPDATE reports SET status = ${v.status}, fixed_in = ${v.fixed_in},
-    status_note = ${v.status_note}, status_updated_at = now() WHERE id = ANY(${ids}) RETURNING id` as { id: number }[]
+  const rows = await sql`UPDATE reports SET status = ${v.status},
+    fixed_in = CASE WHEN ${v.status}::text = 'fixed' THEN COALESCE(${v.fixed_in}::text, fixed_in) END,
+    status_note = COALESCE(${v.status_note}::text, status_note), status_updated_at = now()
+    WHERE id = ANY(${ids}) RETURNING id` as { id: number }[]
   return rows.map((r) => Number(r.id))
 }
-/** Delete one report row (the DSAR flow removes its Drive copies first). */
-export async function deleteReportRow(sql: Sql, id: number): Promise<boolean> {
-  const rows = await sql`DELETE FROM reports WHERE id = ${id} RETURNING id` as { id: number }[]
+/** Delete one report row (the DSAR flow removes its Drive copies first) —
+ *  only while its archive_ref is still ``archiveRef``, so a report the nightly
+ *  archive took in the meantime is cleaned out of that archive first. */
+export async function deleteReportRow(sql: Sql, id: number, archiveRef: string | null): Promise<boolean> {
+  const rows = await sql`DELETE FROM reports WHERE id = ${id}
+    AND archive_ref IS NOT DISTINCT FROM ${archiveRef}::text RETURNING id` as { id: number }[]
   return rows.length > 0
 }
 export async function listUnarchived(sql: Sql): Promise<ReportRecord[]> {
@@ -151,11 +168,14 @@ export async function countUnarchived(sql: Sql): Promise<number> {
   const rows = await sql`SELECT count(*)::int AS n FROM reports WHERE archived_at IS NULL` as { n: number }[]
   return rows[0].n
 }
-export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<void> {
-  if (!ids.length) return
-  await sql`UPDATE reports SET archived_at = now(), archive_ref = ${archiveRef},
+/** Mark the reports among ``ids`` that are still unarchived (and still
+ *  exist); returns the ids it marked. */
+export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<number[]> {
+  if (!ids.length) return []
+  const rows = await sql`UPDATE reports SET archived_at = now(), archive_ref = ${archiveRef},
     image_status = CASE WHEN image_status = 'stored' THEN 'archived' ELSE image_status END
-    WHERE id = ANY(${ids})`
+    WHERE id = ANY(${ids}) AND archived_at IS NULL RETURNING id` as { id: number }[]
+  return rows.map((r) => Number(r.id))
 }
 /** Retention: drop archived report rows created before the cutoff. Returns how many. */
 export async function purgeArchivedReportsBefore(sql: Sql, beforeIso: string): Promise<number> {
@@ -172,10 +192,11 @@ export type ReportStatsRaw = {
   versions: { version: string; n: number }[]
   crashesPerDay: { key: string; n: number }[]
 }
-/** Counts behind the admin stats panel: buckets are UTC days / ISO weeks. */
-export async function reportStats(sql: Sql): Promise<ReportStatsRaw> {
+/** Counts behind the admin stats panel: buckets are UTC days / ISO weeks.
+ *  ``byStatus`` may be passed in when the caller already counted the whole table. */
+export async function reportStats(sql: Sql, byStatus?: Record<ReportStatus, number>): Promise<ReportStatsRaw> {
   const [status, source, weeks, versions, crashes] = await Promise.all([
-    statusCounts(sql, false),
+    byStatus ?? statusCounts(sql),
     sql`SELECT source, count(*)::int AS n FROM reports GROUP BY source`,
     sql`SELECT to_char(date_trunc('week', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS key,
           count(*)::int AS n FROM reports WHERE created_at > now() - interval '13 weeks' GROUP BY 1`,
@@ -255,7 +276,7 @@ export async function purgeAdminSessions(sql: Sql, beforeIso: string): Promise<v
 
 export type AuditEvent =
   | 'login_ok' | 'login_fail' | 'logout' | 'logout_all'
-  | 'archive' | 'status_change' | 'maintenance' | 'dsar_delete'
+  | 'archive' | 'status_change' | 'maintenance' | 'dsar_delete' | 'dsar_failed'
 export type AuditRow = { id: number; at: string; event: AuditEvent; ip_hash: string | null; detail: string | null }
 
 export async function insertAudit(sql: Sql, event: AuditEvent, ipHash: string | null, detail: string | null = null): Promise<void> {

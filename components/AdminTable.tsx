@@ -46,7 +46,7 @@ function DescriptionCell({
         {report.description}
       </p>
       {isLong && (
-        <button type="button" onClick={onToggle} className="mt-1 text-xs font-medium text-accent-2 hover:underline">
+        <button type="button" onClick={onToggle} className="mt-1 text-xs font-medium text-accent-ink hover:underline">
           {expanded ? "Show less" : "Show more"}
         </button>
       )}
@@ -180,9 +180,21 @@ function StatusCell({ report, apiBase }: { report: ReportRecord; apiBase: string
 
 // Data-subject request: removes the report everywhere (Drive screenshot, its
 // entry in the Drive archive, the database row). Typing the id is the confirm.
+const DELETE_ERRORS: Record<string, string> = {
+  not_found: "Already deleted — refresh the list.",
+  busy: "The nightly archive was running — try again in a minute.",
+  drive: "Google Drive did not answer — nothing was deleted from the database; try again.",
+  archive_unreadable: "Its Drive archive could not be read — nothing was deleted; check the archive by hand.",
+  bad_request: "The request was refused — reload the page and try again.",
+  server: "Something went wrong on the server — try again; the activity log has the details.",
+  network: "No connection to the server — try again.",
+};
+
 function DeleteButton({ report, apiBase }: { report: ReportRecord; apiBase: string }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const [message, setMessage] = useState("");
+  const setError = (text: string) => { setMessage(text); setState("error"); };
   async function run() {
     const typed = window.prompt(
       `Delete report #${report.id} everywhere — its database row, its screenshot and its copy in the ` +
@@ -196,19 +208,21 @@ function DeleteButton({ report, apiBase }: { report: ReportRecord; apiBase: stri
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: report.id, confirm: report.id }),
       });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (res.ok) router.refresh();
-      else setState("error");
+      else setError(DELETE_ERRORS[data?.error ?? ""] ?? DELETE_ERRORS.server);
     } catch {
-      setState("error");
+      setError(DELETE_ERRORS.network);
     }
   }
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-1">
       <button type="button" onClick={run} disabled={state === "busy"}
-        className="text-xs font-medium text-accent-rose hover:underline disabled:opacity-50">
+        aria-label={`Delete report ${report.id} everywhere`}
+        className="self-start text-xs font-medium text-accent-rose hover:underline disabled:opacity-50">
         {state === "busy" ? "Deleting…" : "Delete everywhere"}
       </button>
-      {state === "error" && <span className="text-xs text-accent-rose">Failed — nothing was lost; try again</span>}
+      {state === "error" && <span className="text-xs text-accent-rose" role="alert">{message}</span>}
     </div>
   );
 }
@@ -246,7 +260,7 @@ function Filters({ query, pageBase, counts }: {
       <button type="submit" className="btn btn-secondary py-1.5">Apply</button>
       {(query.q || query.status || query.source) && (
         <a href={adminHref(pageBase, query, { q: "", status: null, source: null, page: 1 })}
-          className="py-1.5 text-xs text-accent-2 hover:underline">Clear filters</a>
+          className="py-1.5 text-xs text-accent-ink hover:underline">Clear filters</a>
       )}
     </form>
   );
@@ -256,7 +270,7 @@ function Pager({ query, pageBase, total }: { query: AdminQuery; pageBase: string
   const pages = pageCount(total);
   if (pages <= 1) return null;
   const link = (page: number, text: string, rel?: string) => (
-    <a href={adminHref(pageBase, query, { page })} rel={rel} className="text-accent-2 hover:underline">{text}</a>
+    <a href={adminHref(pageBase, query, { page })} rel={rel} className="text-accent-ink hover:underline">{text}</a>
   );
   return (
     <nav aria-label="Pages" className="flex items-center gap-4 text-sm text-fg-muted">
@@ -272,6 +286,7 @@ function BulkBar({ ids, apiBase, onDone }: { ids: number[]; apiBase: string; onD
   const [status, setStatus] = useState<ReportStatus>("in_review");
   const [fixedIn, setFixedIn] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
+  const [error, setError] = useState("");
   async function apply() {
     setState("saving");
     try {
@@ -280,9 +295,11 @@ function BulkBar({ ids, apiBase, onDone }: { ids: number[]; apiBase: string; onD
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, status, fixed_in: fixedIn }),
       });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (res.ok) { setState("idle"); onDone(); router.refresh(); }
-      else setState("error");
+      else { setError(data?.error ?? ""); setState("error"); }
     } catch {
+      setError("network");
       setState("error");
     }
   }
@@ -302,7 +319,14 @@ function BulkBar({ ids, apiBase, onDone }: { ids: number[]; apiBase: string; onD
         className="btn btn-primary px-3 py-1 text-xs disabled:opacity-50">
         {state === "saving" ? "Saving…" : `Set status for ${ids.length}`}
       </button>
-      {state === "error" && <span className="text-xs text-accent-rose">Failed — check the version format</span>}
+      {state === "error" && (
+        <span className="text-xs text-accent-rose" role="alert">
+          {error === "bad_version" ? "Failed — use a version like 1.9.0"
+            : error === "network" ? "Failed — no connection to the server"
+            : "Failed — reload the page and try again"}
+        </span>
+      )}
+      <span className="text-xs text-fg-muted">Each report keeps its own public note.</span>
     </div>
   );
 }
@@ -418,11 +442,11 @@ export default function AdminTable({
           </p>
           <nav aria-label="Report view" className="mt-2 flex gap-3 text-xs">
             <a href={adminHref(pageBase, query, { view: "unarchived", page: 1 })} aria-current={view === "unarchived" ? "page" : undefined}
-              className={view === "unarchived" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
+              className={view === "unarchived" ? "font-semibold text-fg" : "text-accent-ink hover:underline"}>
               Unarchived
             </a>
             <a href={adminHref(pageBase, query, { view: "all", page: 1 })} aria-current={view === "all" ? "page" : undefined}
-              className={view === "all" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
+              className={view === "all" ? "font-semibold text-fg" : "text-accent-ink hover:underline"}>
               All
             </a>
           </nav>
@@ -517,7 +541,7 @@ export default function AdminTable({
                     </td>
                     <td className="px-3 py-3 text-sm text-fg-muted">
                       {r.contact ? (
-                        <a href={`mailto:${r.contact}`} className="hover:text-accent-2 hover:underline">
+                        <a href={`mailto:${r.contact}`} className="hover:text-accent-ink hover:underline">
                           {r.contact}
                         </a>
                       ) : (
@@ -533,7 +557,9 @@ export default function AdminTable({
                       <ImageCell report={r} apiBase={apiBase} onOpen={() => setLightboxId(r.id)} />
                     </td>
                     <td className="py-3 pl-3 pr-4">
-                      <StatusCell report={r} apiBase={apiBase} />
+                      {/* Keyed on the saved values: after a save or a bulk change the
+                          cell starts again from what the server holds. */}
+                      <StatusCell key={`${r.id}:${r.status}:${r.status_updated_at ?? ""}`} report={r} apiBase={apiBase} />
                       <div className="mt-3 border-t border-border/70 pt-2">
                         <DeleteButton report={r} apiBase={apiBase} />
                       </div>

@@ -4,21 +4,24 @@ import type { ReportRecord } from './db'
 export type ArchiveDeps = {
   listUnarchived: () => Promise<ReportRecord[]>
   downloadImage: (driveId: string) => Promise<Uint8Array>
+  /** Upload a new archive; returns its Drive file id. */
   uploadArchive: (name: string, bytes: Uint8Array) => Promise<string>
-  markArchived: (ids: number[], archiveName: string) => Promise<void>
+  deleteArchive: (fileId: string) => Promise<void>
+  /** Mark the still-unarchived ones among ``ids``; returns the ids it marked. */
+  markArchived: (ids: number[], archiveName: string) => Promise<number[]>
   deleteImage: (driveId: string) => Promise<void>
 }
 export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ archived: number; archiveName?: string }> {
   const reports = await deps.listUnarchived()
   if (!reports.length) return { archived: 0 }
-  const entries = []
-  const toDelete: string[] = []
+  const entries: { report: { id: number }; image?: { name: string; bytes: Uint8Array }; imageId?: string }[] = []
   for (const r of reports) {
     let image: { name: string; bytes: Uint8Array } | undefined
+    let imageId: string | undefined
     if (r.image_status === 'stored' && r.image_drive_id && r.image_name) {
       try {
         image = { name: r.image_name, bytes: await deps.downloadImage(r.image_drive_id) }
-        toDelete.push(r.image_drive_id)
+        imageId = r.image_drive_id
       } catch {
         // A single unreadable image (deleted in Drive, or a transient error) must
         // not wedge the whole nightly archive forever — archive the report's text
@@ -26,12 +29,31 @@ export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ ar
         image = undefined
       }
     }
-    entries.push({ report: r as unknown as { id: number }, image })
+    entries.push({ report: r as unknown as { id: number }, image, imageId })
   }
   const archiveName = `rosu-reports-${today}.zip`
-  const zip = await buildReportsZip(entries)
-  await deps.uploadArchive(archiveName, zip)
-  await deps.markArchived(reports.map((r) => r.id), archiveName)
-  for (const id of toDelete) { try { await deps.deleteImage(id) } catch { /* best effort */ } }
-  return { archived: reports.length, archiveName }
+  const fileId = await deps.uploadArchive(archiveName, await buildReportsZip(entries))
+  let marked: number[]
+  try {
+    marked = await deps.markArchived(reports.map((r) => r.id), archiveName)
+  } catch (e) {
+    // Unmarked reports are archived again by the next run: take this copy back,
+    // so a report never sits in two archives (a deletion request finds one).
+    try { await deps.deleteArchive(fileId) } catch { /* best effort */ }
+    throw e
+  }
+  const kept = new Set(marked)
+  const ours = entries.filter((e) => kept.has(e.report.id))
+  for (const e of ours) {
+    if (e.imageId) { try { await deps.deleteImage(e.imageId) } catch { /* best effort */ } }
+  }
+  if (ours.length < entries.length) {
+    // Some reports were deleted (a data request) or archived by another run
+    // while this ZIP was built: it must not keep a copy of them.
+    // (A new file, then the old one deleted: an updated file would keep the
+    // old content as a Drive revision.)
+    if (ours.length) await deps.uploadArchive(archiveName, await buildReportsZip(ours))
+    await deps.deleteArchive(fileId)
+  }
+  return ours.length ? { archived: ours.length, archiveName } : { archived: 0 }
 }

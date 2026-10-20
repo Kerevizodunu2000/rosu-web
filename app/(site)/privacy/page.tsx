@@ -111,8 +111,9 @@ export default function PrivacyPage() {
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent-2 underline underline-offset-2">
             {CONTACT_EMAIL}
           </a>
-          . A deletion covers every copy we hold: the report itself, its screenshot, and its entry in
-          our archive. If you&apos;re in the EU/EEA or the UK, you also have the right to lodge a complaint with
+          . A deletion removes the report from our database, its screenshot, and its entry in our
+          report archive in Google Drive (files are deleted there for good, not moved to a trash). If
+          a confirmation e-mail was sent, it only ever held the report number and the tracking link. If you&apos;re in the EU/EEA or the UK, you also have the right to lodge a complaint with
           your local data-protection authority; in Turkey you may complain to the Personal Data
           Protection Authority (KVKK).
         </PolicyBlock>

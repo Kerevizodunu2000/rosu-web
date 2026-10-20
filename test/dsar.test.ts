@@ -2,7 +2,7 @@
 import { test, expect } from 'vitest'
 import JSZip from 'jszip'
 import { buildReportsZip, removeReportFromZip } from '@/lib/zip'
-import { deleteReportEverywhere, type DsarDeps } from '@/lib/dsar'
+import { deleteReportEverywhere, parseDsarRequest, type DsarDeps } from '@/lib/dsar'
 import type { ReportRecord } from '@/lib/db'
 
 const report = (id: number, over: Partial<ReportRecord> = {}): ReportRecord => ({
@@ -35,17 +35,20 @@ test('a report is taken out of an archive: JSON, CSV and screenshot', async () =
   expect(again.removed).toBe(false)
 })
 
-function fakeDeps(r: ReportRecord | null, archives: Record<string, Uint8Array>, fail = '') {
+function fakeDeps(r: ReportRecord | null | (() => ReportRecord | null), archives: Record<string, Uint8Array>, fail = '') {
   const calls: string[] = []
   const deps: DsarDeps = {
-    getReport: async () => r,
+    getReport: async () => (typeof r === 'function' ? r() : r),
     deleteDriveFile: async (id) => {
       calls.push(`del ${id}`)
       if (fail === id) throw new Error(`Drive DELETE /files/${id} -> 500: boom`)
       if (fail === `404:${id}`) throw new Error(`Drive DELETE /files/${id} -> 404: gone`)
     },
     findArchives: async (name) => Object.keys(archives).filter((k) => k.endsWith(name)).map((k) => ({ id: k, name })),
-    downloadFile: async (id) => archives[id],
+    downloadFile: async (id) => {
+      if (!(id in archives)) throw new Error(`Drive GET /files/${id}?alt=media -> 404: gone`)
+      return archives[id]
+    },
     uploadArchive: async (name, bytes) => { calls.push(`up ${name}`); archives[`new:${name}`] = bytes; return 'new' },
     deleteReportRow: async (id) => { calls.push(`row ${id}`); return true },
   }
@@ -82,4 +85,65 @@ test('a stored screenshot is deleted; "already gone" is fine; other Drive errors
   expect(await deleteReportEverywhere(t.deps, 8)).toEqual({ ok: false, error: 'drive' })
   expect(t.calls).not.toContain('row 8')
   expect(await deleteReportEverywhere(fakeDeps(null, {}).deps, 9)).toEqual({ ok: false, error: 'not_found' })
+})
+
+test('a screenshot id that is still set is deleted whatever the image status says', async () => {
+  const t = fakeDeps(report(10, { image_status: 'archived', image_drive_id: 'img10' }), {}, '404:img10')
+  expect(await deleteReportEverywhere(t.deps, 10)).toMatchObject({ ok: true })
+  expect(t.calls).toEqual(['del img10', 'row 10'])
+})
+
+test('the nightly archive taking the report mid-way: that archive is cleaned before the row goes', async () => {
+  const archives: Record<string, Uint8Array> = { 'old:rosu-reports-20261020.zip': await archiveWith(11, 12) }
+  let reads = 0
+  const t = fakeDeps(() => (++reads === 1 ? report(11)
+    : report(11, { archive_ref: 'rosu-reports-20261020.zip', image_name: 'report-11.png' })), archives)
+  let rowCalls = 0
+  t.deps.deleteReportRow = async (id, ref) => {
+    rowCalls++
+    t.calls.push(`row ${id} ${ref}`)
+    return ref !== null      // the first try saw archive_ref null; the row has one now
+  }
+  expect(await deleteReportEverywhere(t.deps, 11)).toEqual({ ok: true, imageDeleted: false, archivesChanged: 1 })
+  expect(rowCalls).toBe(2)
+  expect(t.calls).toEqual(['row 11 null', 'up rosu-reports-20261020.zip', 'del old:rosu-reports-20261020.zip',
+    'row 11 rosu-reports-20261020.zip'])
+})
+
+test('a row that keeps changing is reported as busy, and a row deleted meanwhile counts as done', async () => {
+  const t = fakeDeps(report(13), {})
+  t.deps.deleteReportRow = async () => false
+  expect(await deleteReportEverywhere(t.deps, 13)).toEqual({ ok: false, error: 'busy' })
+  let reads = 0
+  const u = fakeDeps(() => (++reads === 1 ? report(14) : null), {})
+  u.deps.deleteReportRow = async () => false
+  expect(await deleteReportEverywhere(u.deps, 14)).toMatchObject({ ok: true })
+})
+
+test('an archive already gone is skipped; an unreadable one stops the deletion', async () => {
+  const t = fakeDeps(report(15, { archive_ref: 'x.zip' }), {})
+  t.deps.findArchives = async (name) => [{ id: 'missing', name }]
+  expect(await deleteReportEverywhere(t.deps, 15)).toMatchObject({ ok: true, archivesChanged: 0 })
+  const broken = fakeDeps(report(16, { archive_ref: 'y.zip' }), { 'b:y.zip': new TextEncoder().encode('not a zip') })
+  expect(await deleteReportEverywhere(broken.deps, 16)).toEqual({ ok: false, error: 'archive_unreadable' })
+  expect(broken.calls).not.toContain('row 16')
+  const zip = new JSZip()
+  zip.file('reports.json', '{"oops": true}')
+  const notAList = fakeDeps(report(17, { archive_ref: 'z.zip' }),
+    { 'c:z.zip': await zip.generateAsync({ type: 'uint8array' }) })
+  expect(await deleteReportEverywhere(notAList.deps, 17)).toEqual({ ok: false, error: 'archive_unreadable' })
+})
+
+test('a delete request must repeat the id exactly', () => {
+  expect(parseDsarRequest({ id: 5, confirm: 5 })).toBe(5)
+  expect(parseDsarRequest({ id: '5', confirm: '5' })).toBe(5)
+  expect(parseDsarRequest({ id: 5, confirm: 6 })).toBeNull()
+  expect(parseDsarRequest({ id: 5 })).toBeNull()
+  expect(parseDsarRequest({ id: 5, confirm: true })).toBeNull()        // Number(true) === 1 must not pass
+  expect(parseDsarRequest({ id: 1, confirm: true })).toBeNull()
+  expect(parseDsarRequest({ id: 1, confirm: [1] })).toBeNull()
+  expect(parseDsarRequest({ id: 1, confirm: ' 1' })).toBeNull()
+  expect(parseDsarRequest({ id: 0, confirm: 0 })).toBeNull()
+  expect(parseDsarRequest({ id: 1.5, confirm: 1.5 })).toBeNull()
+  expect(parseDsarRequest(null)).toBeNull()
 })

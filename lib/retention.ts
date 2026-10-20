@@ -19,20 +19,17 @@ export type DriveEntry = { id: string; name: string; createdTime?: string }
  * Archive ZIPs whose newest possible content is older than the cutoff. Only
  * files named like our own archives are ever candidates — anything else in the
  * folder is left alone. An archive dated D holds reports created up to the end
- * of D, so it goes only once that whole day (and its Drive creation time, when
- * known) is before the cutoff.
+ * of D, so it goes once that whole day is before the cutoff. The name decides,
+ * not the Drive creation time: an archive rewritten later (a report taken out
+ * of it for a deletion request) keeps its name but gets a new creation time,
+ * and must still go when its reports' time is up.
  */
 export function expiredArchives(files: DriveEntry[], cutoff: Date): DriveEntry[] {
   return files.filter((f) => {
     const m = ARCHIVE_RE.exec(f.name)
     if (!m) return false
     const endOfDay = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1)
-    if (!Number.isFinite(endOfDay) || endOfDay > cutoff.getTime()) return false
-    if (f.createdTime) {
-      const created = Date.parse(f.createdTime)
-      if (!Number.isFinite(created) || created > cutoff.getTime()) return false
-    }
-    return true
+    return Number.isFinite(endOfDay) && endOfDay <= cutoff.getTime()
   })
 }
 
