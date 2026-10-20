@@ -13,13 +13,52 @@ const csvCell = (v: unknown) => {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+function reportsCsv(reports: ZipReport[]): string {
+  const cols = Array.from(reports.reduce((set, r) => { Object.keys(r).forEach((k) => set.add(k)); return set }, new Set<string>()))
+  return [cols.join(','), ...reports.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n')
+}
+
 export async function buildReportsZip(entries: Entry[]): Promise<Uint8Array> {
   const zip = new JSZip()
   const reports = entries.map((e) => e.report)
   zip.file('reports.json', JSON.stringify(reports, null, 2))
-  const cols = Array.from(reports.reduce((set, r) => { Object.keys(r).forEach((k) => set.add(k)); return set }, new Set<string>()))
-  const rows = [cols.join(','), ...reports.map((r) => cols.map((c) => csvCell(r[c])).join(','))]
-  zip.file('reports.csv', rows.join('\n'))
+  zip.file('reports.csv', reportsCsv(reports))
   for (const e of entries) if (e.image) zip.file(`images/${e.image.name}`, e.image.bytes)
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+}
+
+/**
+ * Take one report out of a daily archive (the DSAR delete, v1.5): its entry in
+ * reports.json and reports.csv, and its screenshot. ``removed`` is false when
+ * the archive never held it; ``remaining`` is how many reports are left (zero
+ * means the caller should delete the archive rather than keep an empty one).
+ */
+/** An archive whose ZIP or reports.json cannot be read, so a report cannot be taken out of it. */
+export class UnreadableArchiveError extends Error {
+  constructor() { super('archive_unreadable') }
+}
+
+export async function removeReportFromZip(bytes: Uint8Array, id: number, imageName: string | null):
+  Promise<{ bytes: Uint8Array; removed: boolean; remaining: number }> {
+  let zip: JSZip
+  let parsed: unknown
+  try {
+    zip = await JSZip.loadAsync(bytes)
+    const json = zip.file('reports.json')
+    if (!json) return { bytes, removed: false, remaining: -1 }
+    parsed = JSON.parse(await json.async('string'))
+  } catch {
+    throw new UnreadableArchiveError()
+  }
+  // Never guess: an archive whose list is not a list may still hold the report.
+  if (!Array.isArray(parsed)) throw new UnreadableArchiveError()
+  const reports = parsed as ZipReport[]
+  const kept = reports.filter((r) => Number(r?.id) !== id)
+  const image = imageName ? zip.file(`images/${imageName}`) : null
+  if (kept.length === reports.length && !image) return { bytes, removed: false, remaining: reports.length }
+  zip.file('reports.json', JSON.stringify(kept, null, 2))
+  zip.file('reports.csv', reportsCsv(kept))
+  if (image) zip.remove(`images/${imageName}`)
+  const out = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+  return { bytes: out, removed: true, remaining: kept.length }
 }

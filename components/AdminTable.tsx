@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportRecord, ReportStatus } from "@/lib/db";
 import Lightbox from "@/components/Lightbox";
-import { STATUS_LABELS, NOTE_MAX } from "@/lib/reportStatus";
+import { STATUS_LABELS, NOTE_MAX, BULK_MAX } from "@/lib/reportStatus";
+import { adminHref, pageCount, PAGE_SIZE, Q_MAX, type AdminQuery } from "@/lib/adminQuery";
 
 type ArchiveResponse = { ok?: boolean; archived?: number; archiveName?: string };
 
@@ -45,7 +46,7 @@ function DescriptionCell({
         {report.description}
       </p>
       {isLong && (
-        <button type="button" onClick={onToggle} className="mt-1 text-xs font-medium text-accent-2 hover:underline">
+        <button type="button" onClick={onToggle} className="mt-1 text-xs font-medium text-accent-ink hover:underline">
           {expanded ? "Show less" : "Show more"}
         </button>
       )}
@@ -177,18 +178,191 @@ function StatusCell({ report, apiBase }: { report: ReportRecord; apiBase: string
   );
 }
 
+// Data-subject request: removes the report everywhere (Drive screenshot, its
+// entry in the Drive archive, the database row). Typing the id is the confirm.
+const DELETE_ERRORS: Record<string, string> = {
+  not_found: "Already deleted — refresh the list.",
+  busy: "The nightly archive was running — try again in a minute.",
+  drive: "Google Drive did not answer — nothing was deleted from the database; try again.",
+  archive_unreadable: "Its Drive archive could not be read — the report and its archive entry are still there (its screenshot may already be gone); check the archive by hand.",
+  bad_request: "The request was refused — reload the page and try again.",
+  unauthorized: "Your session ended — sign in again, then retry.",
+  forbidden: "Your session ended — sign in again, then retry.",
+  unavailable: "The server is busy right now — try again in a minute.",
+  server: "Something went wrong on the server — try again; the activity log has the details.",
+  network: "No connection to the server — try again.",
+};
+
+function DeleteButton({ report, apiBase }: { report: ReportRecord; apiBase: string }) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const [message, setMessage] = useState("");
+  const setError = (text: string) => { setMessage(text); setState("error"); };
+  async function run() {
+    const typed = window.prompt(
+      `Delete report #${report.id} everywhere — its database row, its screenshot and its copy in the ` +
+      `Drive archive? This cannot be undone.\n\nType ${report.id} to confirm.`);
+    if (typed === null) return;
+    if (typed.trim() !== String(report.id)) { window.alert("The id did not match — nothing was deleted."); return; }
+    setState("busy");
+    try {
+      const res = await fetch(`${apiBase}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: report.id, confirm: report.id }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (res.ok) router.refresh();
+      else {
+        const byStatus = res.status === 401 ? "unauthorized" : res.status === 403 ? "forbidden"
+          : res.status === 503 ? "unavailable" : "server";
+        setError(DELETE_ERRORS[data?.error ?? ""] ?? DELETE_ERRORS[byStatus]);
+      }
+    } catch {
+      setError(DELETE_ERRORS.network);
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <button type="button" onClick={run} disabled={state === "busy"}
+        aria-label={`Delete everywhere, report ${report.id}`}
+        className="self-start text-xs font-medium text-accent-rose hover:underline disabled:opacity-50">
+        {state === "busy" ? "Deleting…" : "Delete everywhere"}
+      </button>
+      {state === "error" && <span className="text-xs text-accent-rose" role="alert">{message}</span>}
+    </div>
+  );
+}
+
+function Filters({ query, pageBase, counts }: {
+  query: AdminQuery; pageBase: string; counts: Record<ReportStatus, number>;
+}) {
+  // A plain GET form: the URL is the state, so filters survive a reload and
+  // work without client JavaScript.
+  return (
+    <form method="get" action={pageBase} className="flex flex-wrap items-end gap-3 text-sm" role="search">
+      {query.view === "all" && <input type="hidden" name="view" value="all" />}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-fg-muted">Search</span>
+        <input name="q" defaultValue={query.q} maxLength={Q_MAX} placeholder="Title, text, e-mail or #id"
+          className="field-input w-64 py-1.5" />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-fg-muted">Status</span>
+        <select name="status" defaultValue={query.status ?? ""} className="field-input py-1.5">
+          <option value="">Any status</option>
+          {STATUS_OPTIONS.map((st) => (
+            <option key={st} value={st}>{STATUS_LABELS[st]} ({counts[st]})</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-fg-muted">Source</span>
+        <select name="source" defaultValue={query.source ?? ""} className="field-input py-1.5">
+          <option value="">App and web</option>
+          <option value="app">App</option>
+          <option value="web">Web</option>
+        </select>
+      </label>
+      <button type="submit" className="btn btn-secondary py-1.5">Apply</button>
+      {(query.q || query.status || query.source) && (
+        <a href={adminHref(pageBase, query, { q: "", status: null, source: null, page: 1 })}
+          className="py-1.5 text-xs text-accent-ink hover:underline">Clear filters</a>
+      )}
+    </form>
+  );
+}
+
+function Pager({ query, pageBase, total }: { query: AdminQuery; pageBase: string; total: number }) {
+  const pages = pageCount(total);
+  if (pages <= 1) return null;
+  const link = (page: number, text: string, rel?: string) => (
+    <a href={adminHref(pageBase, query, { page })} rel={rel} className="text-accent-ink hover:underline">{text}</a>
+  );
+  return (
+    <nav aria-label="Pages" className="flex items-center gap-4 text-sm text-fg-muted">
+      {query.page > 1 ? link(query.page - 1, "← Newer", "prev") : <span className="opacity-50">← Newer</span>}
+      <span>Page {Math.min(query.page, pages)} of {pages}</span>
+      {query.page < pages ? link(query.page + 1, "Older →", "next") : <span className="opacity-50">Older →</span>}
+    </nav>
+  );
+}
+
+function BulkBar({ ids, apiBase, onDone }: { ids: number[]; apiBase: string; onDone: () => void }) {
+  const router = useRouter();
+  const [status, setStatus] = useState<ReportStatus>("in_review");
+  const [fixedIn, setFixedIn] = useState("");
+  const [state, setState] = useState<"idle" | "saving" | "error">("idle");
+  const [error, setError] = useState("");
+  async function apply() {
+    setState("saving");
+    try {
+      const res = await fetch(`${apiBase}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, status, fixed_in: fixedIn }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (res.ok) { setState("idle"); onDone(); router.refresh(); }
+      else { setError(data?.error ?? ""); setState("error"); }
+    } catch {
+      setError("network");
+      setState("error");
+    }
+  }
+  return (
+    <div className="card flex flex-wrap items-center gap-3 px-4 py-3 text-sm" role="region" aria-label="Bulk status">
+      <span className="font-medium text-fg">{ids.length} selected</span>
+      <label className="sr-only" htmlFor="bulk-status">New status</label>
+      <select id="bulk-status" value={status} onChange={(e) => setStatus(e.target.value as ReportStatus)}
+        className="field-input py-1 text-xs">
+        {STATUS_OPTIONS.map((st) => <option key={st} value={st}>{STATUS_LABELS[st]}</option>)}
+      </select>
+      {status === "fixed" && (
+        <input value={fixedIn} onChange={(e) => setFixedIn(e.target.value)} placeholder="Fixed in (e.g. 1.9.0)"
+          aria-label="Fixed in version" className="field-input w-40 py-1 font-mono text-xs" />
+      )}
+      <button type="button" onClick={apply} disabled={state === "saving"}
+        className="btn btn-primary px-3 py-1 text-xs disabled:opacity-50">
+        {state === "saving" ? "Saving…" : `Set status for ${ids.length}`}
+      </button>
+      {state === "error" && (
+        <span className="text-xs text-accent-rose" role="alert">
+          {error === "bad_version" ? "Failed — use a version like 1.9.0"
+            : error === "network" ? "Failed — no connection to the server"
+            : "Failed — reload the page and try again"}
+        </span>
+      )}
+      <span className="text-xs text-fg-muted">Each report keeps its own public note.</span>
+    </div>
+  );
+}
+
 export default function AdminTable({
   reports,
+  total,
+  counts,
   apiBase,
-  view,
+  query,
   pageBase,
 }: {
   reports: ReportRecord[];
+  total: number;
+  counts: Record<ReportStatus, number>;
   apiBase: string;
-  view: "unarchived" | "all";
+  query: AdminQuery;
   pageBase: string;
 }) {
+  const view = query.view;
   const router = useRouter();
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const toggleSelected = (id: number) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else if (next.size < BULK_MAX) next.add(id);
+    return next;
+  });
+  const allOnPage = reports.length > 0 && reports.every((r) => selected.has(r.id));
   const [busyArchive, setBusyArchive] = useState(false);
   const [busyLogout, setBusyLogout] = useState(false);
   const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
@@ -268,18 +442,19 @@ export default function AdminTable({
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-fg">Submissions</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {view === "all"
-              ? `${reports.length} most recent report${reports.length === 1 ? "" : "s"} (archived included)`
-              : `${reports.length} unarchived report${reports.length === 1 ? "" : "s"}`}
+            {`${total} ${view === "all" ? "" : "unarchived "}report${total === 1 ? "" : "s"}` +
+              (query.q || query.status || query.source ? " match" + (total === 1 ? "es" : "") : "") +
+              (view === "all" ? " (archived included)" : "") +
+              (total > PAGE_SIZE ? ` · ${PAGE_SIZE} per page` : "")}
           </p>
           <nav aria-label="Report view" className="mt-2 flex gap-3 text-xs">
-            <a href={pageBase} aria-current={view === "unarchived" ? "page" : undefined}
-              className={view === "unarchived" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
+            <a href={adminHref(pageBase, query, { view: "unarchived", page: 1 })} aria-current={view === "unarchived" ? "page" : undefined}
+              className={view === "unarchived" ? "font-semibold text-fg" : "text-accent-ink hover:underline"}>
               Unarchived
             </a>
-            <a href={`${pageBase}?view=all`} aria-current={view === "all" ? "page" : undefined}
-              className={view === "all" ? "font-semibold text-fg" : "text-accent-2 hover:underline"}>
-              All recent
+            <a href={adminHref(pageBase, query, { view: "all", page: 1 })} aria-current={view === "all" ? "page" : undefined}
+              className={view === "all" ? "font-semibold text-fg" : "text-accent-ink hover:underline"}>
+              All
             </a>
           </nav>
         </div>
@@ -313,9 +488,16 @@ export default function AdminTable({
         </div>
       </div>
 
+      <Filters query={query} pageBase={pageBase} counts={counts} />
+      {selected.size > 0 && (
+        <BulkBar ids={[...selected]} apiBase={apiBase} onDone={() => setSelected(new Set())} />
+      )}
+
       {reports.length === 0 ? (
         <div className="card flex flex-col items-center gap-1.5 px-6 py-16 text-center">
-          <p className="text-sm font-medium text-fg">{view === "all" ? "No reports yet." : "No reports right now."}</p>
+          <p className="text-sm font-medium text-fg">
+            {query.q || query.status || query.source ? "No reports match these filters." : view === "all" ? "No reports yet." : "No reports right now."}
+          </p>
           <p className="text-sm text-fg-muted">New submissions will show up here as they arrive.</p>
         </div>
       ) : (
@@ -323,7 +505,11 @@ export default function AdminTable({
           <table className="w-full min-w-[1080px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-fg-muted">
-                <th className="py-3 pl-4 pr-3 font-medium">Time</th>
+                <th className="py-3 pl-4 pr-1 font-medium">
+                  <input type="checkbox" aria-label="Select every report on this page" checked={allOnPage}
+                    onChange={() => setSelected(allOnPage ? new Set() : new Set(reports.slice(0, BULK_MAX).map((r) => r.id)))} />
+                </th>
+                <th className="py-3 pl-2 pr-3 font-medium">Time</th>
                 <th className="px-3 py-3 font-medium">Source</th>
                 <th className="px-3 py-3 font-medium">Report</th>
                 <th className="px-3 py-3 font-medium">Contact</th>
@@ -337,15 +523,18 @@ export default function AdminTable({
                 const isApp = r.source === "app";
                 return (
                   <tr key={r.id} className="border-b border-border/70 align-top last:border-b-0 hover:bg-bg/40">
-                    <td
-                      className={`border-l-2 py-3 pl-4 pr-3 ${isApp ? "border-l-accent-2/50" : "border-l-transparent"}`}
-                    >
+                    <td className={`border-l-2 py-3 pl-4 pr-1 ${isApp ? "border-l-accent-2/50" : "border-l-transparent"}`}>
+                      <input type="checkbox" aria-label={`Select report ${r.id}`} checked={selected.has(r.id)}
+                        onChange={() => toggleSelected(r.id)} />
+                    </td>
+                    <td className="py-3 pl-2 pr-3">
                       <time
                         dateTime={r.created_at}
                         className="block whitespace-nowrap font-mono text-xs tabular-nums text-fg-muted"
                       >
                         {formatDate(r.created_at)}
                       </time>
+                      <span className="mt-1 block font-mono text-[10px] text-fg-muted">#{r.id}</span>
                     </td>
                     <td className="px-3 py-3">
                       <SourceBadge source={r.source} />
@@ -359,7 +548,7 @@ export default function AdminTable({
                     </td>
                     <td className="px-3 py-3 text-sm text-fg-muted">
                       {r.contact ? (
-                        <a href={`mailto:${r.contact}`} className="hover:text-accent-2 hover:underline">
+                        <a href={`mailto:${r.contact}`} className="hover:text-accent-ink hover:underline">
                           {r.contact}
                         </a>
                       ) : (
@@ -375,7 +564,12 @@ export default function AdminTable({
                       <ImageCell report={r} apiBase={apiBase} onOpen={() => setLightboxId(r.id)} />
                     </td>
                     <td className="py-3 pl-3 pr-4">
-                      <StatusCell report={r} apiBase={apiBase} />
+                      {/* Keyed on the saved values: after a save or a bulk change the
+                          cell starts again from what the server holds. */}
+                      <StatusCell key={`${r.id}:${r.status}:${r.status_updated_at ?? ""}`} report={r} apiBase={apiBase} />
+                      <div className="mt-3 border-t border-border/70 pt-2">
+                        <DeleteButton report={r} apiBase={apiBase} />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -384,6 +578,8 @@ export default function AdminTable({
           </table>
         </div>
       )}
+
+      <Pager query={query} pageBase={pageBase} total={total} />
 
       {lightboxId !== null && (
         <Lightbox

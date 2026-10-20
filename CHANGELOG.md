@@ -10,6 +10,120 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+Work toward **2.0 "Brand & Show"**.
+
+### Added
+- **Türkçe and 日本語.** Every public page is also at `/tr/…` and `/ja/…` (English stays at
+  the bare paths), built ahead of time. A language switcher in the header keeps you on the
+  same page. Every page names its language versions (`hreflang`), and the sitemap lists
+  all of them. The guide is translated; release notes, devlog posts and the API reference
+  stay in English and say so. The privacy policy and terms keep their binding English and
+  Turkish texts, and the Japanese pages add a short summary.
+- Report tracking links (on the page and in the confirmation e-mail) open the status page
+  in the reporter's language.
+- **Rosu Wrapped** (`/tools/wrapped`): your year in beatmaps from a Rosu JSON export — sets
+  added, the busiest month, top artists, favourite mode, hours of music, the hardest map —
+  with a 1080×1350 PNG to share. Runs in the browser; nothing is uploaded.
+- A 404 page in all three languages.
+
+### Changed
+- The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song
+  detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
+  and the update check only asks for the latest version number.
+
+## [1.6.0] - 2026-10-20
+
+**Tools: free helpers that run in your browser.**
+
+### Added
+- **/tools** with two in-browser helpers; nothing is uploaded:
+  - **Missing pack checker** — drop your beatmap pack files (or paste their names) and see
+    which numbered osu!, mania, taiko and catch packs (S / SM / ST / SC) you are missing
+    between your lowest and highest, with links to each pack page and a copyable list.
+    The rules are the desktop app's gap detection; other series are listed, never guessed.
+  - **Library share card** — load a Rosu JSON export (Search → Export… → JSON) and download
+    a 1200×630 PNG with your set count, hours of music, hardest star rating, mania key
+    counts, modes and top artists.
+- "Tools" in the site navigation and the sitemap; both pages are in the e2e and
+  accessibility checks.
+
+### Fixed
+Found by the v1.6 code and security review (before release):
+- **Two deletion requests at once could leave one report in a rebuilt archive.** Every job
+  that rewrites the Drive archives — the nightly archive, the retention sweep and "Delete
+  everywhere" — now takes turns through a lease in the database (`job_locks`, schema 4;
+  a lease a killed function never gives back simply runs out). A deletion that cannot get
+  its turn within a few seconds says the archive is busy and changes nothing.
+- A deletion also checks every archive dated between the report's creation and the archive
+  it names, so a copy left by a run that died before marking its reports is found too.
+- When the archive job cannot take reports deleted mid-run back out of its new ZIP (after
+  three tries), the activity log names the file to fix by hand.
+- Missing pack checker: a date or timestamp in a file name (`S20240101 - …`) no longer
+  counts as a pack (it froze the tab building a 20-million-entry gap list); downloads still
+  in progress (`.crdownload`, `.part`) do not count as owned; very long pasted lines are
+  cut; a list past 20,000 names says so; the result summary is announced to screen readers;
+  "Choose files…" shows a keyboard focus ring.
+- Share card: names and artists can no longer run off the card or into another column; only
+  real set records are counted, and a library past 200,000 sets says so; an older, slower
+  file load can no longer replace a newer one; the card's content is also available as text.
+- Admin: the delete button's accessible name starts with its visible text; an expired
+  session or a busy server get their own message.
+
+Found by the v1.5 code and security review:
+- **Delete everywhere** now also deletes a screenshot whose status says "archived" while its
+  Drive file id is still set.
+- **A rewritten archive escaped the 12-month retention**: the retention sweep read the
+  Drive creation time, which a rewrite resets. It now goes by the date in the archive's
+  name (an archive dated D only holds reports created by the end of D). Archives are
+  never updated in place, because Drive would keep the old content as a revision.
+- **Delete everywhere vs. the nightly archive**: the row is deleted only while its archive
+  reference is still the one that was cleaned (otherwise the new archive is cleaned
+  first), and the archive job takes a report that was deleted while its ZIP was being
+  built back out of that ZIP. An archive upload whose reports could not be marked is
+  deleted again, so a report is never in two archives.
+- Bulk status kept no public note or "fixed in" version: each report now keeps its own
+  unless a new one is given.
+- A report's status cell could show stale values after a save or a bulk change.
+- The delete route requires a JSON body whose `confirm` is exactly the id (a number or a
+  string of digits); failed deletions are written to the activity log too, and a failing
+  audit write no longer turns a finished deletion into an error. Drive settings are only
+  needed when a report has something in Drive.
+- An unreadable archive stops the deletion with a clear message instead of a generic
+  Drive error; an archive that is already gone is skipped.
+- Admin list: control characters are removed from the search; a page past the end shows
+  the last page; the status menu's counts follow the other filters.
+- Admin panel: clearer error messages, a label on every delete button, link colors with
+  enough contrast for small text, UTC in chart titles, a message when a chart has
+  nothing to show, a visible chart baseline, and one status-count query fewer.
+
+### Changed
+- `/privacy` describes a deletion precisely (database row, screenshot, archive entry;
+  Drive deletions are permanent) instead of promising "every copy".
+
+## [1.5.0] - 2026-10-20
+
+**Admin Panel Pro.**
+
+### Added
+- **Search, filters and pages** in the admin list: text search over title, description,
+  contact e-mail or `#id`; status (with counts) and source filters; 50 reports per page
+  with newer/older links. The URL holds the state, so a filtered view survives a reload.
+  The old 100-row cap is gone.
+- **Bulk status**: tick reports (or the whole page) and set one status — with "fixed in"
+  — for up to 100 at once. `POST /api/admin/status` accepts `ids` alongside `id`.
+- **Delete everywhere** (data-subject requests): one action removes a report's database
+  row, its screenshot in Drive and its entry in the Drive archive it went into (the
+  archive is rewritten without it, or deleted when it was the last report). Drive goes
+  first, so a failure keeps the row for a retry; "already gone" is not an error; the
+  admin types the report id to confirm; the audit log records the id only.
+  `POST /api/admin/delete`.
+- **Statistics**: reports total / open / fixed and crash reports in the last 14 days;
+  reports per week (12 weeks) and crash reports per day (14 days) as column charts with
+  a table view; reports by app version.
+
+### Changed
+- `/privacy` says that a deletion covers every copy (report, screenshot, archive entry).
+
 ## [1.4.0] - 2026-10-20
 
 Quality & visibility release.

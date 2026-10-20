@@ -3,10 +3,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { lookupAdmin } from "@/lib/adminGuard";
 import { adminApiBase, adminPageBase, adminSlug } from "@/lib/adminPath";
-import { listRecentUnarchived, listRecentAll, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
+import { searchReports, statusCounts, reportStats, listAudit, listCrashGroups, countLiveAdminSessions } from "@/lib/db";
+import { clampPage, likePattern, parseAdminQuery, PAGE_SIZE } from "@/lib/adminQuery";
 import LoginForm from "./login-form";
 import AdminTable from "@/components/AdminTable";
-import { AuditPanel, CrashPanel, SecurityPanel } from "@/components/AdminPanels";
+import { AuditPanel, CrashPanel, SecurityPanel, StatsPanel } from "@/components/AdminPanels";
 
 export const metadata: Metadata = {
   title: "Admin — Rosu",
@@ -31,7 +32,7 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const slug = adminSlug();
   const apiBase = adminApiBase(slug);
   const pageBase = adminPageBase(slug);
@@ -55,18 +56,34 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const view = (await searchParams).view === "all" ? "all" : "unarchived";
-  const [reports, audit, crashes, liveSessions] = await Promise.all([
-    view === "all" ? listRecentAll(admin.sql, 100) : listRecentUnarchived(admin.sql, 100),
+  const parsed = parseAdminQuery(await searchParams);
+  const exactId = /^#?\d{1,9}$/.test(parsed.q) ? Number(parsed.q.replace("#", "")) : null;
+  const filter = {
+    unarchivedOnly: parsed.view === "unarchived", pattern: likePattern(parsed.q), exactId,
+    status: parsed.status, source: parsed.source, limit: PAGE_SIZE,
+  };
+  const countsP = statusCounts(admin.sql, filter);
+  // With no filters these are the whole table's counts: the stats reuse them.
+  const unfiltered = parsed.view === "all" && !parsed.q && !parsed.source;
+  const [first, counts, stats, audit, crashes, liveSessions] = await Promise.all([
+    searchReports(admin.sql, { ...filter, offset: (parsed.page - 1) * PAGE_SIZE }),
+    countsP,
+    unfiltered ? countsP.then((c) => reportStats(admin.sql, c)) : reportStats(admin.sql),
     listAudit(admin.sql, 40),
     listCrashGroups(admin.sql, 50),
     countLiveAdminSessions(admin.sql),
   ]);
+  // A page past the end (an old link, or rows deleted since) shows the last one.
+  const query = { ...parsed, page: clampPage(parsed.page, first.total) };
+  const page = query.page === parsed.page ? first
+    : await searchReports(admin.sql, { ...filter, offset: (query.page - 1) * PAGE_SIZE });
 
   return (
     <AdminChrome>
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-5 py-8 sm:px-8">
-        <AdminTable reports={reports} apiBase={apiBase} view={view} pageBase={pageBase} />
+        <AdminTable reports={page.rows} total={page.total} counts={counts} apiBase={apiBase}
+          query={query} pageBase={pageBase} />
+        <StatsPanel stats={stats} />
         <CrashPanel crashes={crashes} />
         <div className="grid gap-12 lg:grid-cols-2">
           <AuditPanel events={audit} />

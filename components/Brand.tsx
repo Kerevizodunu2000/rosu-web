@@ -9,10 +9,13 @@ type BrandProps = {
   as?: "link" | "span";
   /** Preload the mark — only for the above-the-fold copy (the nav), not the footer. */
   priority?: boolean;
+  /** Where the link goes (the home page in the current language). */
+  href?: string;
+  label?: string;
 };
 
 /** The Rosu mark + wordmark lockup, reused in Nav and Footer. */
-export default function Brand({ className = "", markSize = 32, as = "link", priority = false }: BrandProps) {
+export default function Brand({ className = "", markSize = 32, as = "link", priority = false, href = "/", label = "Rosu home" }: BrandProps) {
   const content = (
     <>
       <Image
@@ -34,7 +37,7 @@ export default function Brand({ className = "", markSize = 32, as = "link", prio
   }
 
   return (
-    <Link href="/" className={classes} aria-label="Rosu home">
+    <Link href={href} className={classes} aria-label={label}>
       {content}
     </Link>
   );

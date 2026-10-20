@@ -5,7 +5,13 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import Link from "next/link";
 import Script from "next/script";
 import { LIMITS, ALLOWED_MIME } from "@/lib/validation";
-import { CONTACT_EMAIL, PRIVACY_PATH, TERMS_PATH } from "@/lib/links";
+import { CONTACT_EMAIL } from "@/lib/links";
+import { localePath, type Locale } from "@/lib/i18n";
+import { richNodes } from "./Rich";
+import type { Dict } from "@/content/i18n/en";
+
+type T = Dict["form"];
+const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k: string) => (k in v ? String(v[k]) : m));
 
 // Cloudflare's script attaches a global `window.turnstile`; we drive it via the
 // explicit render API (not the implicit `cf-turnstile` div) so we can reset the
@@ -35,19 +41,19 @@ const ACCEPT_MIME = Object.keys(ALLOWED_MIME).join(","); // e.g. "image/png,imag
 type Screenshot = { name: string; mime: string; b64: string; previewUrl: string };
 type Status = "idle" | "sending" | "success" | "error";
 
-function friendlyError(code: string | undefined): string {
+function friendlyError(code: string | undefined, t: T): string {
   switch (code) {
     case "captcha":
-      return "Please complete the captcha and try again.";
+      return t.errCaptcha;
     case "rate_limited":
     case "rate_minute":
     case "rate_day":
     case "rate_global":
-      return "Too many submissions — please try again later.";
+      return t.errRate;
     case "missing_fields":
-      return "Title and description are required.";
+      return t.errRequired;
     default:
-      return "Something went wrong sending your report.";
+      return t.errGeneric;
   }
 }
 
@@ -85,7 +91,9 @@ function IconCheck() {
   );
 }
 
-export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvailable?: boolean }) {
+export default function ReportForm({ ackEmailAvailable = false, t, locale }: {
+  ackEmailAvailable?: boolean; t: T; locale: Locale;
+}) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
@@ -129,12 +137,12 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
     setFileError(null);
 
     if (!Object.prototype.hasOwnProperty.call(ALLOWED_MIME, file.type)) {
-      setFileError("Please choose a PNG, JPEG, GIF, WEBP, or BMP image.");
+      setFileError(t.errImageType);
       e.target.value = "";
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setFileError(`That image is too large — max ${Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`);
+      setFileError(fill(t.errImageSize, { mb: Math.round(MAX_IMAGE_BYTES / (1024 * 1024)) }));
       e.target.value = "";
       return;
     }
@@ -143,7 +151,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
       const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
       setScreenshot({ name: file.name, mime: file.type, b64, previewUrl: dataUrl });
     } catch {
-      setFileError("Could not read that file — please try another.");
+      setFileError(t.errImageRead);
     }
   }
 
@@ -174,14 +182,15 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
     if (!title.trim() || !description.trim()) return;
     if (SITE_KEY && !turnstileToken) {
       setStatus("error");
-      setErrorMessage(friendlyError("captcha"));
+      setErrorMessage(friendlyError("captcha", t));
       return;
     }
 
     setStatus("sending");
     setErrorMessage(null);
 
-    const lang = navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en";
+    // The page's language, or on the English pages the browser's (so we know how to reply).
+    const lang = locale !== "en" ? locale : navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en";
     const payload: Record<string, unknown> = {
       title: title.trim(),
       description: description.trim(),
@@ -211,14 +220,14 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
         return;
       }
 
-      setErrorMessage(friendlyError(data?.error));
+      setErrorMessage(friendlyError(data?.error, t));
       setStatus("error");
       if (data?.error === "captcha" && widgetIdRef.current && window.turnstile) {
         window.turnstile.reset(widgetIdRef.current);
         setTurnstileToken("");
       }
     } catch {
-      setErrorMessage(friendlyError(undefined));
+      setErrorMessage(friendlyError(undefined, t));
       setStatus("error");
     }
   }
@@ -230,19 +239,15 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
           <IconCheck />
         </div>
         <h2 ref={successRef} tabIndex={-1} className="mt-4 text-xl font-semibold text-fg outline-none">
-          Thanks — your report reached us.
+          {t.sentTitle}
         </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-fg-muted">
-          {contact.trim()
-            ? "We'll reply to the email you left if we need more details or have an update."
-            : "Leave a contact email next time if you'd like a reply from us."}
+          {contact.trim() ? t.sentReply : t.sentNoReply}
         </p>
         {statusUrl && (
           <div className="mx-auto mt-6 max-w-md rounded-xl border border-border bg-bg p-4 text-left">
-            <p className="text-sm font-medium text-fg">Track this report</p>
-            <p className="mt-1 text-xs leading-relaxed text-fg-muted">
-              Save this private link to see when it&apos;s in review or fixed. It&apos;s shown only once.
-            </p>
+            <p className="text-sm font-medium text-fg">{t.track}</p>
+            <p className="mt-1 text-xs leading-relaxed text-fg-muted">{t.trackNote}</p>
             <div className="mt-3 flex items-center gap-2">
               <a
                 href={statusUrl}
@@ -262,17 +267,17 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
                 }}
                 className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
               >
-                {copied ? "Copied" : "Copy link"}
+                {copied ? "✓" : t.copyLink}
               </button>
             </div>
           </div>
         )}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <a href="/report" className="btn btn-primary">
-            Send another report
+          <a href={localePath(locale, "/report")} className="btn btn-primary">
+            {t.another}
           </a>
-          <Link href="/" className="btn btn-secondary">
-            Back to home
+          <Link href={localePath(locale, "/")} className="btn btn-secondary">
+            {t.backHome}
           </Link>
         </div>
       </div>
@@ -283,7 +288,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
     <form onSubmit={handleSubmit} aria-busy={status === "sending"} className="flex flex-col gap-6">
       {/* Honeypot — hidden from sighted and AT users alike; a filled-in value marks the submission as spam server-side. */}
       <div className="sr-only" aria-hidden="true">
-        <label htmlFor="hp">Leave this field empty</label>
+        <label htmlFor="hp">{t.honeypot}</label>
         <input
           type="text"
           id="hp"
@@ -299,7 +304,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
         <div>
           <div className="flex items-baseline justify-between gap-2">
             <label htmlFor="title" className="field-label">
-              Title
+              {t.titleLabel}
             </label>
             <span className="font-mono text-xs text-fg-muted">
               {title.length}/{LIMITS.title}
@@ -313,7 +318,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
             maxLength={LIMITS.title}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="One line describing the problem"
+            placeholder={t.titlePlaceholder}
             className="field-input mt-1.5"
           />
         </div>
@@ -321,7 +326,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
         <div>
           <div className="flex items-baseline justify-between gap-2">
             <label htmlFor="description" className="field-label">
-              What happened?
+              {t.descriptionLabel}
             </label>
             <span className="font-mono text-xs text-fg-muted">
               {description.length}/{LIMITS.description}
@@ -335,14 +340,14 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
             maxLength={LIMITS.description}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Steps to reproduce, what you expected, what happened instead…"
+            placeholder={t.descriptionPlaceholder}
             className="field-textarea mt-1.5"
           />
         </div>
 
         <fieldset className="m-0 border-0 p-0">
           <legend className="field-label p-0">
-            Screenshot <span className="font-normal text-fg-muted">(optional)</span>
+            {t.screenshot} <span className="font-normal text-fg-muted">{t.optional}</span>
           </legend>
 
           <div className="mt-1.5">
@@ -362,7 +367,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
                   className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-bg px-4 py-2 text-sm font-medium text-fg transition-colors hover:border-accent-2 hover:text-accent-2"
                 >
                   <IconUpload />
-                  Choose image
+                  {t.chooseImage}
                 </label>
               </span>
             ) : (
@@ -377,7 +382,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
                 <button
                   type="button"
                   onClick={clearScreenshot}
-                  aria-label="Remove screenshot"
+                  aria-label={t.removeScreenshot}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-accent/10 hover:text-accent-2"
                 >
                   <IconX />
@@ -386,7 +391,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
             )}
           </div>
 
-          <p className="field-hint">PNG, JPEG, GIF, WEBP, or BMP — up to 3 MB.</p>
+          <p className="field-hint">{t.screenshotHint}</p>
           {fileError && (
             <p className="field-error" role="alert">
               {fileError}
@@ -396,7 +401,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
 
         <div>
           <label htmlFor="contact" className="field-label">
-            Contact email <span className="font-normal text-fg-muted">(optional)</span>
+            {t.contact} <span className="font-normal text-fg-muted">{t.optional}</span>
           </label>
           <input
             id="contact"
@@ -406,10 +411,10 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
             maxLength={LIMITS.contact}
             value={contact}
             onChange={(e) => setContact(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={t.contactPlaceholder}
             className="field-input mt-1.5"
           />
-          <p className="field-hint">So we can reply if we have a question or a fix. Never shared publicly or sold.</p>
+          <p className="field-hint">{t.contactHint}</p>
           {ackEmailAvailable && (
             <label className="mt-3 flex items-start gap-2.5 text-sm text-fg-muted">
               <input
@@ -420,8 +425,8 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
                 className="mt-0.5 h-4 w-4 accent-[var(--color-accent-2)]"
               />
               <span>
-                E-mail me a confirmation with the tracking link{" "}
-                <span className="text-fg-muted/80">(one message, nothing else)</span>
+                {t.ack}{" "}
+                <span className="text-fg-muted/80">{t.ackNote}</span>
               </span>
             </label>
           )}
@@ -429,7 +434,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
 
         {SITE_KEY && (
           <div>
-            <span className="field-label">Verify you&apos;re human</span>
+            <span className="field-label">{t.captcha}</span>
             <Script
               src="https://challenges.cloudflare.com/turnstile/v0/api.js"
               strategy="afterInteractive"
@@ -445,11 +450,7 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
         <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-xl border border-accent-rose/25 bg-accent-rose/[0.06] p-4 text-sm outline-none">
           <p className="font-medium text-accent-rose">{errorMessage}</p>
           <p className="mt-1 text-fg-muted">
-            You can also reach us directly at{" "}
-            <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-accent-2 underline underline-offset-2">
-              {CONTACT_EMAIL}
-            </a>
-            .
+            {richNodes(fill(t.errFallback, { email: `[${CONTACT_EMAIL}](mailto:${CONTACT_EMAIL})` }), locale)}
           </p>
         </div>
       )}
@@ -461,26 +462,16 @@ export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvai
           aria-describedby={showSubmitHint ? "submit-hint" : undefined}
           className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
-          {status === "sending" ? "Sending…" : "Send report"}
+          {status === "sending" ? t.sending : t.send}
         </button>
         {showSubmitHint && (
           <p id="submit-hint" className="field-hint">
-            Complete the check above to enable sending.
+            {t.submitHint}
           </p>
         )}
         {/* Transparency line at the point of collection (KVKK/GDPR): links, not a
             consent checkbox — processing rests on legitimate interest, not opt-in. */}
-        <p className="field-hint">
-          By sending, you agree to our{" "}
-          <Link href={PRIVACY_PATH} className="text-accent-2 underline underline-offset-2">
-            Privacy Policy
-          </Link>{" "}
-          and{" "}
-          <Link href={TERMS_PATH} className="text-accent-2 underline underline-offset-2">
-            Terms
-          </Link>
-          .
-        </p>
+        <p className="field-hint">{richNodes(t.agree, locale)}</p>
       </div>
     </form>
   );

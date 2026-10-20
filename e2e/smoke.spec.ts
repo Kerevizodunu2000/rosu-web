@@ -21,6 +21,21 @@ const PAGES = [
   ['/status', /Status/i],
   ['/privacy', /Privacy/i],
   ['/terms', /Terms/i],
+  ['/tools', /Tools/i],
+  ['/tools/missing-packs', /pack/i],
+  ['/tools/share-card', /share card/i],
+  ['/tools/wrapped', /Wrapped/i],
+  // The same site in Turkish and Japanese (v2.0).
+  ['/tr', /beatmap paketi/i],
+  ['/tr/docs', /Rosu kullanımı/i],
+  ['/tr/report', /Sorun bildir/i],
+  ['/tr/tools/missing-packs', /paket/i],
+  ['/tr/privacy', /Gizlilik/i],
+  ['/ja', /ビートマップパック/],
+  ['/ja/docs', /使い方/],
+  ['/ja/report', /問題を報告/],
+  ['/ja/tools/wrapped', /Wrapped/],
+  ['/ja/terms', /利用規約/],
 ] as const
 
 for (const [path, heading] of PAGES) {
@@ -70,4 +85,61 @@ test('health endpoint reports the database honestly', async ({ request }) => {
   const res = await request.get('/api/health')
   expect([200, 503]).toContain(res.status())
   expect(await res.json()).toHaveProperty('db')
+})
+
+test('missing pack checker lists interior gaps from pasted names', async ({ page }) => {
+  await page.goto('/tools/missing-packs')
+  await page.getByText('…or paste a list of names').click()
+  await page.getByLabel('Pack file names, one per line').fill('S1 - a.zip\nS4 - b.zip\nSM7 - c.zip')
+  await page.getByRole('button', { name: 'Check the list' }).click()
+  await expect(page.getByRole('link', { name: 'S2' })).toHaveAttribute('href', 'https://osu.ppy.sh/beatmaps/packs/S2')
+  await expect(page.getByRole('link', { name: 'S3' })).toBeVisible()
+  await expectAccessible(page)
+})
+
+test('share card draws from a Rosu JSON export', async ({ page }) => {
+  await page.goto('/tools/share-card')
+  const json = JSON.stringify({ sets: [{ artist: 'Camellia', modes: ['osu!mania'], stars: [6.5], keys: [7], length_seconds: 200 }] })
+  await page.getByLabel('Rosu export (JSON)').setInputFiles({ name: 'export.json', mimeType: 'application/json', buffer: Buffer.from(json) })
+  await expect(page.getByRole('img', { name: /1 beatmap sets/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeEnabled()
+  await expectAccessible(page)
+})
+
+test('the language switcher keeps the page and the page says its language', async ({ page }) => {
+  await page.goto('/docs')
+  await page.getByRole('navigation', { name: 'Language' }).getByRole('link', { name: 'Türkçe' }).click()
+  await expect(page).toHaveURL(/\/tr\/docs$/)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'tr')
+  await expect(page.getByRole('navigation', { name: 'Dil' }).getByRole('link', { name: 'Türkçe' })).toHaveAttribute('aria-current', 'true')
+  await page.getByRole('navigation', { name: 'Dil' }).getByRole('link', { name: '日本語' }).click()
+  await expect(page).toHaveURL(/\/ja\/docs$/)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
+  const alt = await page.locator('link[rel="alternate"][hreflang="tr-TR"]').getAttribute('href')
+  expect(alt).toMatch(/\/tr\/docs$/)
+})
+
+test('an unknown language or page is a 404 that says so in every language', async ({ page }) => {
+  for (const path of ['/de/docs', '/tr/nope']) {
+    const res = await page.goto(path)
+    expect(res?.status()).toBe(404)
+  }
+  await expect(page.getByText('Sayfa bulunamadı')).toBeVisible()
+  await expect(page.getByText('ページが見つかりません')).toBeVisible()
+})
+
+test('Rosu Wrapped sums up the chosen year', async ({ page }) => {
+  await page.goto('/tools/wrapped')
+  const json = JSON.stringify({ sets: [
+    { artist: 'Camellia', modes: ['osu!mania'], stars: [6.5], length_seconds: 200, first_seen_at: '2026-03-01T10:00:00' },
+    { artist: 'Camellia', modes: ['osu!mania'], stars: [4], length_seconds: 100, first_seen_at: '2026-03-09T10:00:00' },
+    { artist: 'xi', modes: ['osu!'], stars: [5], length_seconds: 100, first_seen_at: '2025-07-01T10:00:00' },
+  ] })
+  await page.getByLabel('Rosu export (JSON)').setInputFiles({ name: 'export.json', mimeType: 'application/json', buffer: Buffer.from(json) })
+  await expect(page.getByLabel('Year')).toHaveValue('2026')
+  await expect(page.getByText('Your busiest month: March (2)')).toBeVisible()
+  await page.getByLabel('Year').selectOption('2025')
+  await expect(page.getByText('Your busiest month: July (1)')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download PNG' })).toBeEnabled()
+  await expectAccessible(page)
 })

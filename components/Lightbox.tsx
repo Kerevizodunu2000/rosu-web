@@ -48,14 +48,19 @@ function IconChevron({ dir }: { dir: "left" | "right" }) {
  * - Focus moves to the close button on open and is restored on close.
  * The parent controls mounting — render <Lightbox …/> only while open.
  */
+export type LightboxLabels = { previous: string; next: string; close: string };
+const DEFAULT_LABELS: LightboxLabels = { previous: "Previous image", next: "Next image", close: "Close" };
+
 export default function Lightbox({
   images,
   startIndex = 0,
   onClose,
+  labels = DEFAULT_LABELS,
 }: {
   images: LightboxImage[];
   startIndex?: number;
   onClose: () => void;
+  labels?: LightboxLabels;
 }) {
   const count = images.length;
   const hasGallery = count > 1;
@@ -244,7 +249,7 @@ export default function Lightbox({
       {hasGallery && (
         <button
           type="button"
-          aria-label="Previous image"
+          aria-label={labels.previous}
           onClick={(e) => { e.stopPropagation(); go(-1); }}
           className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-fg shadow-card backdrop-blur transition-colors hover:bg-surface sm:left-4"
         >
@@ -284,7 +289,7 @@ export default function Lightbox({
       {hasGallery && (
         <button
           type="button"
-          aria-label="Next image"
+          aria-label={labels.next}
           onClick={(e) => { e.stopPropagation(); go(1); }}
           className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/85 text-fg shadow-card backdrop-blur transition-colors hover:bg-surface sm:right-4"
         >
@@ -296,7 +301,7 @@ export default function Lightbox({
         ref={closeRef}
         type="button"
         onClick={(e) => { e.stopPropagation(); onCloseRef.current(); }}
-        aria-label="Close"
+        aria-label={labels.close}
         className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface/85 text-fg shadow-card backdrop-blur transition-colors hover:bg-surface"
       >
         <IconX />

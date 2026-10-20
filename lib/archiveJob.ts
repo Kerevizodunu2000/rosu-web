@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { runArchive } from './archiveService'
+import { ArchiveRewriteError, runArchive } from './archiveService'
 import { runRetention } from './retention'
+import { deleteReportEverywhere, type DsarResult } from './dsar'
 import { DriveClient } from './drive'
 import {
   getDb, listUnarchived, markArchived, pruneRateEvents, purgeArchivedReportsBefore,
   purgeCrashesBefore, purgeAuditBefore, purgeAdminSessions, purgeTotpSteps, insertAudit,
+  listReportById, deleteReportRow, acquireJobLock, releaseJobLock, type Sql,
 } from './db'
 import { requireEnv } from './env'
+import { DRIVE_ARCHIVES_LOCK, LockBusyError, withLock, type LockStore } from './lock'
+
+const lockStore = (sql: Sql): LockStore => ({
+  acquire: (name, holder, ttl) => acquireJobLock(sql, name, holder, ttl),
+  release: (name, holder) => releaseJobLock(sql, name, holder),
+})
+// The jobs that rewrite archives wait their turn for up to ~30 s (a deletion
+// request takes seconds); a request from the admin page waits less.
+const JOB_WAIT = { attempts: 10, waitMs: 3000 }
 
 function driveFromEnv(): DriveClient {
   return new DriveClient({
@@ -39,7 +50,7 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
   }
   let result: { archived: number; archiveName?: string }
   try {
-    result = await runArchive({
+    result = await withLock(lockStore(sql), DRIVE_ARCHIVES_LOCK, () => runArchive({
     listUnarchived: () => listUnarchived(sql),
     downloadImage: (id) => drive.downloadFile(id),
     uploadArchive: async (name, bytes) => {
@@ -47,9 +58,16 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
       const archives = await drive.ensureFolder('Archives', root)
       return drive.uploadFile({ name, mimeType: 'application/zip', bytes, parent: archives })
     },
+    deleteArchive: (fileId) => drive.deleteFile(fileId),
     markArchived: (ids, ref) => markArchived(sql, ids, ref),
     deleteImage: (id) => drive.deleteFile(id),
-  }, today)
+  }, today), JOB_WAIT)
+  } catch (e) {
+    if (e instanceof ArchiveRewriteError) {
+      // Leave a trail the admin sees: this file needs a manual look in Drive.
+      try { await insertAudit(sql, 'maintenance', null, `archive: ${e.message} — remove it by hand`) } catch { /* reported by the cron */ }
+    }
+    throw e
   } finally {
     await pruneRate()
   }
@@ -60,7 +78,7 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
 export async function runRetentionJob(): Promise<{ archivesDeleted: number; reportsDeleted: number; failures: number }> {
   const sql = await getDb()
   const drive = driveFromEnv()
-  const result = await runRetention({
+  const result = await withLock(lockStore(sql), DRIVE_ARCHIVES_LOCK, () => runRetention({
     listArchives: async () => {
       const root = await drive.ensureFolder(rootName())
       return drive.listFolder(await drive.ensureFolder('Archives', root))
@@ -73,11 +91,34 @@ export async function runRetentionJob(): Promise<{ archivesDeleted: number; repo
       await purgeAdminSessions(sql, new Date(nowMs - 24 * 60 * 60 * 1000).toISOString())
       await purgeTotpSteps(sql, new Date(nowMs - 10 * 60 * 1000).toISOString())
     },
-  })
+  }), JOB_WAIT)
   if (result.archivesDeleted || result.reportsDeleted || result.failures) {
     await insertAudit(sql, 'maintenance', null,
       `retention: ${result.archivesDeleted} archive(s), ${result.reportsDeleted} report row(s) deleted` +
       (result.failures ? `, ${result.failures} archive deletion(s) failed` : ''))
   }
   return result
+}
+
+/** The DSAR delete (lib/dsar.ts) wired to the real Drive folder layout. The
+ *  Drive client is only built when a step needs it, so a report with nothing
+ *  in Drive can be deleted even while the Drive settings are missing. */
+export async function runDsarDelete(sql: Sql, id: number): Promise<DsarResult> {
+  let client: DriveClient | null = null
+  const drive = () => (client ??= driveFromEnv())
+  const archivesFolder = async () => drive().ensureFolder('Archives', await drive().ensureFolder(rootName()))
+  try {
+    return await withLock(lockStore(sql), DRIVE_ARCHIVES_LOCK, () => deleteReportEverywhere({
+    getReport: (rid) => listReportById(sql, rid),
+    deleteDriveFile: (fileId) => drive().deleteFile(fileId),
+    listArchives: async () => drive().listFolder(await archivesFolder()),
+    downloadFile: (fileId) => drive().downloadFile(fileId),
+    uploadArchive: async (name, bytes) =>
+      drive().uploadFile({ name, mimeType: 'application/zip', bytes, parent: await archivesFolder() }),
+    deleteReportRow: (rid, ref) => deleteReportRow(sql, rid, ref),
+  }, id), { attempts: 3, waitMs: 2000 })
+  } catch (e) {
+    if (e instanceof LockBusyError) return { ok: false, error: 'busy' }
+    throw e
+  }
 }

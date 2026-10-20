@@ -7,7 +7,7 @@
 // must stay safe to re-run: CREATE ... IF NOT EXISTS / ADD COLUMN IF NOT EXISTS.
 // Bump SCHEMA_VERSION whenever a statement is added.
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS schema_meta (
@@ -112,4 +112,14 @@ export const SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS crash_events_fp_idx ON crash_events (fingerprint, created_at)`,
   `CREATE INDEX IF NOT EXISTS crash_events_created_idx ON crash_events (created_at)`,
+
+  // ── job locks (v1.6, schema 4) ──────────────────────────────────────────────
+  // A short lease per named job (lib/lock.ts): the nightly archive, retention
+  // and deletion requests all rewrite Drive archives and must take turns. A
+  // lease that is not released (a killed function) simply runs out.
+  `CREATE TABLE IF NOT EXISTS job_locks (
+    name   text PRIMARY KEY,
+    holder text NOT NULL,
+    until  timestamptz NOT NULL
+  )`,
 ]

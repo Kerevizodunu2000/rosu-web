@@ -11,6 +11,11 @@ updates:
       # One PR for the routine minor/patch bumps instead of one per package.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # typescript-eslint (via eslint-config-next) does not support TypeScript 7
+      # yet, so `npm run lint` fails on it. Lift this once it does.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: chore
       include: scope
