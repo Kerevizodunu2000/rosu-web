@@ -9,7 +9,7 @@ import { CONTACT_EMAIL } from "@/lib/links";
  * clipboard on click — so it works whether or not the visitor has a mail app
  * set up. Shows a brief "Copied!" confirmation.
  */
-export default function CopyEmail({ className = "" }: { className?: string }) {
+export default function CopyEmail({ className = "", copiedText = "Copied!" }: { className?: string; copiedText?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleClick() {
@@ -34,7 +34,7 @@ export default function CopyEmail({ className = "" }: { className?: string }) {
           copied ? "opacity-100" : "opacity-0"
         }`}
       >
-        {copied ? "Copied!" : ""}
+        {copied ? copiedText : ""}
       </span>
     </span>
   );

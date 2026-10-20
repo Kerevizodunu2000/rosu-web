@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
           return drive.uploadFile({ ...img, parent: inbox })
         },
         newStatusToken,
-        statusUrl: (token) => statusUrl(token),
+        statusUrl: (token, lang) => statusUrl(token, undefined, lang),
         ackEmailEnabled: ack !== null,
         allowAck: async (ipHash, recipient) => {
           const toHash = hashIp('ack-to:' + recipient.trim().toLowerCase(), requireEnv('IP_HASH_SALT'))

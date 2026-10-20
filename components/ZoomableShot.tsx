@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Lightbox, { type LightboxImage } from "./Lightbox";
+import Lightbox, { type LightboxImage, type LightboxLabels } from "./Lightbox";
 
 function IconZoom() {
   return (
@@ -24,12 +24,14 @@ export default function ZoomableShot({
   images,
   index = 0,
   label,
+  labels,
   className = "",
   children,
 }: {
   images: LightboxImage[];
   index?: number;
   label: string;
+  labels?: LightboxLabels;
   className?: string;
   children: ReactNode;
 }) {
@@ -51,7 +53,7 @@ export default function ZoomableShot({
           <IconZoom />
         </span>
       </button>
-      {open ? <Lightbox images={images} startIndex={index} onClose={() => setOpen(false)} /> : null}
+      {open ? <Lightbox images={images} startIndex={index} labels={labels} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

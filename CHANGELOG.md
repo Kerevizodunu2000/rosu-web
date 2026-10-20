@@ -10,6 +10,27 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+Work toward **2.0 "Brand & Show"**.
+
+### Added
+- **Türkçe and 日本語.** Every public page is also at `/tr/…` and `/ja/…` (English stays at
+  the bare paths), built ahead of time. A language switcher in the header keeps you on the
+  same page. Every page names its language versions (`hreflang`), and the sitemap lists
+  all of them. The guide is translated; release notes, devlog posts and the API reference
+  stay in English and say so. The privacy policy and terms keep their binding English and
+  Turkish texts, and the Japanese pages add a short summary.
+- Report tracking links (on the page and in the confirmation e-mail) open the status page
+  in the reporter's language.
+- **Rosu Wrapped** (`/tools/wrapped`): your year in beatmaps from a Rosu JSON export — sets
+  added, the busiest month, top artists, favourite mode, hours of music, the hardest map —
+  with a 1080×1350 PNG to share. Runs in the browser; nothing is uploaded.
+- A 404 page in all three languages.
+
+### Changed
+- The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song
+  detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
+  and the update check only asks for the latest version number.
+
 ## [1.6.0] - 2026-10-20
 
 **Tools: free helpers that run in your browser.**

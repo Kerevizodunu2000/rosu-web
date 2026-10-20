@@ -3,10 +3,13 @@
 
 import { useState } from "react";
 import { compactRanges, MAX_NAMES, packReport, packUrl, SERIES_LABEL, type PackReport, type Standard } from "@/lib/packs";
+import type { Dict } from "@/content/i18n/en";
+
+const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k: string) => (k in v ? String(v[k]) : m));
 
 const SHOW_LINKS = 60;   // per series; the copyable list carries the rest
 
-export default function MissingPacks() {
+export default function MissingPacks({ t }: { t: Dict["missing"] }) {
   const [report, setReport] = useState<PackReport | null>(null);
   const [text, setText] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -30,36 +33,34 @@ export default function MissingPacks() {
         onDrop={(e) => { e.preventDefault(); setDragging(false); fromFiles(e.dataTransfer.files); }}
         className={`card flex flex-col items-center gap-3 border-2 border-dashed px-6 py-10 text-center ${dragging ? "border-accent-2" : "border-border"}`}
       >
-        <p className="text-sm font-medium text-fg">Drop your pack files here</p>
-        <p className="max-w-md text-sm text-fg-muted">
-          Only their names are read, in your browser — nothing is uploaded.
-        </p>
+        <p className="text-sm font-medium text-fg">{t.drop}</p>
+        <p className="max-w-md text-sm text-fg-muted">{t.dropNote}</p>
         <label className="btn btn-secondary file-trigger relative cursor-pointer">
-          Choose files…
+          {t.choose}
           <input type="file" multiple className="sr-only" onChange={(e) => fromFiles(e.target.files)} />
         </label>
       </div>
 
       <details className="text-sm text-fg-muted">
-        <summary className="cursor-pointer">…or paste a list of names</summary>
+        <summary className="cursor-pointer">{t.paste}</summary>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6}
-          aria-label="Pack file names, one per line" placeholder={"S1234 - Beatmap Pack #1234.zip\nSM45 - …"}
+          aria-label={t.pasteLabel} placeholder={"S1234 - Beatmap Pack #1234.zip\nSM45 - …"}
           className="field-textarea mt-2 w-full font-mono text-xs" />
         <button type="button" className="btn btn-secondary mt-2" onClick={() => run(text.split(/\r?\n/))}>
-          Check the list
+          {t.check}
         </button>
       </details>
 
       {/* Always mounted, so screen readers announce the summary when it changes. */}
       <p role="status" className="text-sm text-fg-muted empty:hidden">
-        {report && `${report.total} packs recognised${report.unrecognised ? ` · ${report.unrecognised} other files ignored` : ""}.`}
-        {report?.truncated && ` Only the first ${MAX_NAMES.toLocaleString("en")} names were read.`}
+        {report && `${fill(t.recognised, { n: report.total })}${report.unrecognised ? fill(t.ignored, { n: report.unrecognised }) : ""}.`}
+        {report?.truncated && fill(t.truncated, { n: MAX_NAMES.toLocaleString() })}
       </p>
       {report && (
         <section className="flex flex-col gap-5">
           {report.standard.length === 0 && (
             <p className="card px-5 py-4 text-sm text-fg">
-              No standard packs (S, SM, ST, SC) found — those are the series a gap can be proven for.
+              {t.noStandard}
             </p>
           )}
           {report.standard.map((s) => {
@@ -71,7 +72,7 @@ export default function MissingPacks() {
                     {SERIES_LABEL[s.series as Standard]} ({s.series}{s.lowest}–{s.series}{s.highest})
                   </h2>
                   <span className="text-sm text-fg-muted">
-                    {s.owned} owned · <strong className="text-fg">{s.missing.length} missing</strong>
+                    {fill(t.owned, { n: s.owned })} · <strong className="text-fg">{fill(t.missingCount, { n: s.missing.length })}</strong>
                   </span>
                 </div>
                 {s.missing.length > 0 ? (
@@ -84,26 +85,25 @@ export default function MissingPacks() {
                         </li>
                       ))}
                       {s.missing.length > SHOW_LINKS && (
-                        <li className="text-fg-muted">… and {s.missing.length - SHOW_LINKS} more (in the list)</li>
+                        <li className="text-fg-muted">{fill(t.more, { n: s.missing.length - SHOW_LINKS })}</li>
                       )}
                     </ul>
                     <div className="flex items-center gap-3">
                       <button type="button" className="btn btn-secondary py-1.5 text-xs" onClick={() => copy(s.series, list)}>
-                        Copy the list
+                        {t.copy}
                       </button>
-                      {copied === s.series && <span className="text-xs text-fg-muted">Copied</span>}
+                      {copied === s.series && <span className="text-xs text-fg-muted">✓</span>}
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-fg-muted">No gaps between your lowest and highest pack.</p>
+                  <p className="text-sm text-fg-muted">{t.noGaps}</p>
                 )}
               </div>
             );
           })}
           {report.other.length > 0 && (
             <p className="text-sm text-fg-muted">
-              Also found: {report.other.map((o) => `${o.series} (${o.owned})`).join(", ")}. These series
-              aren&apos;t numbered without gaps, so missing ones can&apos;t be told from names alone.
+              {fill(t.alsoFound, { list: report.other.map((o) => `${o.series} (${o.owned})`).join(", ") })}
             </p>
           )}
         </section>

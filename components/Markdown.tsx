@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { Fragment } from "react";
 import { parseMarkdown, type Block, type Inline } from "@/lib/markdown";
+import { localePath, type Locale } from "@/lib/i18n";
 
-function Inlines({ nodes }: { nodes: Inline[] }) {
+function Inlines({ nodes, locale }: { nodes: Inline[]; locale: Locale }) {
   return (
     <>
       {nodes.map((n, i) => {
@@ -16,19 +17,21 @@ function Inlines({ nodes }: { nodes: Inline[] }) {
               </code>
             );
           case "strong":
-            return <strong key={i} className="font-semibold text-fg"><Inlines nodes={n.c} /></strong>;
+            return <strong key={i} className="font-semibold text-fg"><Inlines nodes={n.c} locale={locale} /></strong>;
           case "em":
-            return <em key={i}><Inlines nodes={n.c} /></em>;
+            return <em key={i}><Inlines nodes={n.c} locale={locale} /></em>;
           case "link": {
             const external = /^https?:/i.test(n.href);
+            // A site path follows the page's language (/privacy → /tr/privacy).
+            const href = n.href.startsWith("/") && !n.href.startsWith("//") ? localePath(locale, n.href) : n.href;
             return (
               <a
                 key={i}
-                href={n.href}
+                href={href}
                 className="text-accent-2 underline underline-offset-2"
                 {...(external ? { target: "_blank", rel: "noopener noreferrer nofollow" } : {})}
               >
-                <Inlines nodes={n.c} />
+                <Inlines nodes={n.c} locale={locale} />
               </a>
             );
           }
@@ -45,27 +48,27 @@ const HEADING = {
   4: "mt-5 text-sm font-semibold uppercase tracking-wide text-fg-muted",
 } as const;
 
-function BlockView({ b }: { b: Block }) {
+function BlockView({ b, locale }: { b: Block; locale: Locale }) {
   switch (b.t) {
     case "h": {
       const Tag = (`h${Math.min(b.level + 1, 6)}`) as "h2" | "h3" | "h4" | "h5";
-      return <Tag id={b.id} className={`scroll-mt-24 ${HEADING[b.level]}`}><Inlines nodes={b.c} /></Tag>;
+      return <Tag id={b.id} className={`scroll-mt-24 ${HEADING[b.level]}`}><Inlines nodes={b.c} locale={locale} /></Tag>;
     }
     case "p":
-      return <p className="mt-4 leading-relaxed text-fg-muted"><Inlines nodes={b.c} /></p>;
+      return <p className="mt-4 leading-relaxed text-fg-muted"><Inlines nodes={b.c} locale={locale} /></p>;
     case "ul":
     case "ol": {
       const Tag = b.t;
       return (
         <Tag className={`mt-4 flex flex-col gap-1.5 pl-5 leading-relaxed text-fg-muted ${b.t === "ul" ? "list-disc" : "list-decimal"}`}>
-          {b.items.map((it, i) => <li key={i}><Inlines nodes={it} /></li>)}
+          {b.items.map((it, i) => <li key={i}><Inlines nodes={it} locale={locale} /></li>)}
         </Tag>
       );
     }
     case "quote":
       return (
         <blockquote className="mt-4 border-l-2 border-accent-2/60 pl-4 italic text-fg-muted">
-          <Inlines nodes={b.c} />
+          <Inlines nodes={b.c} locale={locale} />
         </blockquote>
       );
     case "code":
@@ -81,11 +84,13 @@ function BlockView({ b }: { b: Block }) {
 }
 
 /** Renders the safe Markdown subset of lib/markdown.ts (headings start at <h2>). */
-export default function Markdown({ source, className = "" }: { source: string; className?: string }) {
+export default function Markdown({ source, className = "", locale = "en" }: {
+  source: string; className?: string; locale?: Locale;
+}) {
   const blocks = parseMarkdown(source);
   return (
     <div className={className}>
-      {blocks.map((b, i) => <BlockView key={i} b={b} />)}
+      {blocks.map((b, i) => <BlockView key={i} b={b} locale={locale} />)}
     </div>
   );
 }

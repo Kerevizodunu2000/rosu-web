@@ -12,7 +12,7 @@ export type ReportDeps = {
   uploadImage: (a: { name: string; mimeType: string; bytes: Uint8Array }) => Promise<string>
   /** Fresh random tracking token for the reporter's status link. */
   newStatusToken: () => string
-  statusUrl: (token: string) => string
+  statusUrl: (token: string, lang: string) => string
   /** Whether confirmation e-mails are configured (RESEND_API_KEY + ACK_EMAIL_FROM). */
   ackEmailEnabled: boolean
   /** Separate, tight budget for confirmation e-mails (they go to an unverified address). */
@@ -56,7 +56,7 @@ export async function handleReport(a: { raw: unknown; ip: string; rateKey?: stri
     app_version: v.appVersion, os: v.os, lang: v.lang, ip_hash: ipHash,
     status_token_hash: hashStatusToken(statusToken),
   })
-  const status_url = deps.statusUrl(statusToken)
+  const status_url = deps.statusUrl(statusToken, v.lang)
 
   if (v.image) {
     try {

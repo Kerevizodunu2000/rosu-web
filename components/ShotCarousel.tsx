@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Lightbox from "./Lightbox";
+import Lightbox, { type LightboxLabels } from "./Lightbox";
 
 export type CarouselShot = {
   src: string;
@@ -34,7 +34,14 @@ function IconZoom() {
  * is open, and never starts for users who prefer reduced motion. Clicking a
  * card opens the full-pool Lightbox gallery at that screenshot.
  */
-export default function ShotCarousel({ shots }: { shots: CarouselShot[] }) {
+export type CarouselLabels = { enlarge: string; show: string; pages: string; lightbox: LightboxLabels };
+const DEFAULT_LABELS: CarouselLabels = {
+  enlarge: "Enlarge the {title} screenshot", show: "Show {title} first", pages: "Screenshot pages",
+  lightbox: { previous: "Previous image", next: "Next image", close: "Close" },
+};
+const fill = (template: string, title: string) => template.replace("{title}", title);
+
+export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots: CarouselShot[]; labels?: CarouselLabels }) {
   const count = shots.length;
   const [offset, setOffset] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -79,7 +86,7 @@ export default function ShotCarousel({ shots }: { shots: CarouselShot[] }) {
               <button
                 type="button"
                 onClick={() => setLightboxIndex(idx)}
-                aria-label={`Enlarge the ${shot.title} screenshot`}
+                aria-label={fill(labels.enlarge, shot.title)}
                 aria-haspopup="dialog"
                 className="group relative block w-full cursor-zoom-in overflow-hidden"
               >
@@ -108,13 +115,13 @@ export default function ShotCarousel({ shots }: { shots: CarouselShot[] }) {
       </div>
 
       {count > VISIBLE && (
-        <div className="mt-6 flex items-center justify-center gap-2" role="group" aria-label="Screenshot pages">
+        <div className="mt-6 flex items-center justify-center gap-2" role="group" aria-label={labels.pages}>
           {shots.map((s, i) => (
             <button
               key={s.src}
               type="button"
               onClick={() => setOffset(i)}
-              aria-label={`Show ${s.title} first`}
+              aria-label={fill(labels.show, s.title)}
               aria-current={i === offset}
               className={`h-2 rounded-full transition-all duration-300 ${
                 i === offset ? "w-6 bg-accent-2" : "w-2 bg-fg-muted/30 hover:bg-fg-muted/60"
@@ -125,7 +132,7 @@ export default function ShotCarousel({ shots }: { shots: CarouselShot[] }) {
       )}
 
       {lightboxIndex !== null && (
-        <Lightbox images={galleryImages} startIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+        <Lightbox images={galleryImages} startIndex={lightboxIndex} labels={labels.lightbox} onClose={() => setLightboxIndex(null)} />
       )}
     </div>
   );

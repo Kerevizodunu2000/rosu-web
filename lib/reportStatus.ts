@@ -5,6 +5,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { REPORT_STATUSES, type ReportStatus } from './db'
 import { SITE_URL } from './links'
+import { DEFAULT_LOCALE, isLocale, localePath } from './i18n'
 
 export const STATUS_PATH = '/report/status'
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/ // 32 random bytes, base64url, no padding
@@ -23,7 +24,10 @@ export function publicBaseUrl(env: Record<string, string | undefined> = process.
   if (env.VERCEL_ENV === 'production' || !env.VERCEL_URL) return SITE_URL
   return `https://${env.VERCEL_URL}`
 }
-export const statusUrl = (token: string, base = publicBaseUrl()) => `${base}${STATUS_PATH}/${token}`
+/** The tracking link, on the status page in the reporter's language when the
+ *  report says one we have (``lang`` is free text from the client). */
+export const statusUrl = (token: string, base = publicBaseUrl(), lang: string = DEFAULT_LOCALE) =>
+  `${base}${localePath(isLocale(lang) ? lang : DEFAULT_LOCALE, STATUS_PATH)}/${token}`
 
 export const STATUS_LABELS: Record<ReportStatus, string> = {
   received: 'Received',

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import type { Dict } from "@/content/i18n/en";
 
 // Plain-language privacy disclosure for the report form — no hidden telemetry,
 // no vague "we may collect data" language. Sourced from the design spec's
@@ -24,35 +25,19 @@ function IconDot() {
   );
 }
 
-export default function Disclosure({ className = "" }: { className?: string }) {
+export default function Disclosure({ className = "", t }: { className?: string; t: Dict["disclosure"] }) {
   return (
     <div className={`card p-5 sm:p-6 ${className}`}>
-      <h2 className="text-sm font-semibold text-fg">What we send</h2>
+      <h2 className="text-sm font-semibold text-fg">{t.title}</h2>
       <ul className="mt-3 flex flex-col gap-2.5 text-sm leading-relaxed text-fg-muted">
-        <li className="flex gap-2">
-          <IconDot />
-          <span>The title, description, and contact email you type above — nothing more.</span>
-        </li>
-        <li className="flex gap-2">
-          <IconDot />
-          <span>The screenshot you attach, if any. It&apos;s stored privately and never made public.</span>
-        </li>
-        <li className="flex gap-2">
-          <IconDot />
-          <span>Your browser&apos;s UI language, so we know whether to reply in English or Turkish.</span>
-        </li>
-        <li className="flex gap-2">
-          <IconDot />
-          <span>
-            After sending you get a private link to follow the report&apos;s status. We e-mail it to you
-            only if you tick the confirmation box.
-          </span>
-        </li>
+        {t.items.map((item) => (
+          <li key={item} className="flex gap-2">
+            <IconDot />
+            <span>{item}</span>
+          </li>
+        ))}
       </ul>
-      <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-fg-muted">
-        Your IP address is hashed and used only to prevent spam — we never store it in the clear.
-        There&apos;s no hidden telemetry: Rosu only ever sends what&apos;s visible on this page.
-      </p>
+      <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-fg-muted">{t.footer}</p>
     </div>
   );
 }

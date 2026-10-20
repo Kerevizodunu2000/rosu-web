@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // A status page's URL is its secret: never leak it in a Referer header.
       { source: "/report/status/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      { source: "/:lang(tr|ja)/report/status/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];
   },
 };

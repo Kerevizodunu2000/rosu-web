@@ -5,6 +5,8 @@ import Brand from "./Brand";
 import CopyEmail from "./CopyEmail";
 import CurrentYear from "./CurrentYear";
 import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_PATH, TERMS_PATH, SOCIAL } from "@/lib/links";
+import { localePath, type Locale } from "@/lib/i18n";
+import { dict, fmt } from "@/content/i18n";
 
 function GithubIcon() {
   return (
@@ -58,66 +60,43 @@ function SocialLink({ href, label, children }: { href: string; label: string; ch
   );
 }
 
-export default function Footer() {
+const FOOT_LINK = "transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4";
+
+export default function Footer({ locale }: { locale: Locale }) {
+  const t = dict(locale);
+  const f = t.footer;
+  const social = (network: string) => fmt(f.socialOn, { network });
   return (
     <footer className="border-t border-border">
       <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
         <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-sm">
-            <Brand markSize={28} />
-            <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-              Rosu is free, open-source (GPL-3.0-or-later), donation-only and non-commercial.
-              Unofficial, fan-made — not affiliated with or endorsed by ppy Pty Ltd or osu!.
-            </p>
+            <Brand markSize={28} href={localePath(locale, "/")} label={t.common.homeLabel} />
+            <p className="mt-4 text-sm leading-relaxed text-fg-muted">{f.blurb}</p>
           </div>
 
           <div className="flex flex-col items-start gap-4 sm:items-end">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-fg-muted">
-              <Link
-                href={PRIVACY_PATH}
-                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
-              >
-                Privacy
-              </Link>
-              <Link
-                href={TERMS_PATH}
-                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
-              >
-                Terms
-              </Link>
-              <Link
-                href="/devlog"
-                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
-              >
-                Devlog
-              </Link>
-              <Link
-                href="/status"
-                className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
-              >
-                Status
-              </Link>
-              <CopyEmail className="transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4" />
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4"
-              >
+              <Link href={localePath(locale, PRIVACY_PATH)} className={FOOT_LINK}>{f.privacy}</Link>
+              <Link href={localePath(locale, TERMS_PATH)} className={FOOT_LINK}>{f.terms}</Link>
+              <Link href={localePath(locale, "/devlog")} className={FOOT_LINK}>{f.devlog}</Link>
+              <Link href={localePath(locale, "/status")} className={FOOT_LINK}>{f.status}</Link>
+              <CopyEmail className={FOOT_LINK} copiedText={f.emailCopied} />
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 ${FOOT_LINK}`}>
                 <GithubIcon />
                 GitHub
               </a>
             </div>
 
             <div className="flex items-center gap-2.5">
-              <SocialLink href={SOCIAL.instagram} label="Rosu on Instagram"><InstagramIcon /></SocialLink>
-              <SocialLink href={SOCIAL.x} label="Rosu on X"><XIcon /></SocialLink>
-              <SocialLink href={SOCIAL.youtube} label="Rosu on YouTube"><YoutubeIcon /></SocialLink>
-              <SocialLink href={SOCIAL.reddit} label="Rosu on Reddit"><RedditIcon /></SocialLink>
+              <SocialLink href={SOCIAL.instagram} label={social("Instagram")}><InstagramIcon /></SocialLink>
+              <SocialLink href={SOCIAL.x} label={social("X")}><XIcon /></SocialLink>
+              <SocialLink href={SOCIAL.youtube} label={social("YouTube")}><YoutubeIcon /></SocialLink>
+              <SocialLink href={SOCIAL.reddit} label={social("Reddit")}><RedditIcon /></SocialLink>
             </div>
 
             <a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
-              Download
+              {t.common.download}
             </a>
           </div>
         </div>

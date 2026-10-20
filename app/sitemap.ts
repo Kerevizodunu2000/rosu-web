@@ -2,24 +2,39 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/links";
 import { listPosts } from "@/lib/devlog";
+import { LOCALES, LOCALE_TAGS, localePath } from "@/lib/i18n";
 
+type Freq = NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+
+const PAGES: { path: string; changeFrequency: Freq; priority: number }[] = [
+  { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/changelog", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/docs", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/docs/api", changeFrequency: "monthly", priority: 0.4 },
+  { path: "/devlog", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/tools", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/tools/missing-packs", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/tools/share-card", changeFrequency: "monthly", priority: 0.5 },
+  { path: "/tools/wrapped", changeFrequency: "monthly", priority: 0.5 },
+  { path: "/report", changeFrequency: "yearly", priority: 0.5 },
+  { path: "/status", changeFrequency: "daily", priority: 0.3 },
+  { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
+];
+
+/** Every page once per language, each listing all its language versions. */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages: MetadataRoute.Sitemap = [
-    { url: `${SITE_URL}/`, changeFrequency: "weekly", priority: 1 },
-    { url: `${SITE_URL}/changelog`, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${SITE_URL}/docs`, changeFrequency: "monthly", priority: 0.7 },
-    { url: `${SITE_URL}/docs/api`, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${SITE_URL}/devlog`, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_URL}/tools`, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_URL}/tools/missing-packs`, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_URL}/tools/share-card`, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${SITE_URL}/report`, changeFrequency: "yearly", priority: 0.5 },
-    { url: `${SITE_URL}/status`, changeFrequency: "daily", priority: 0.3 },
-    { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.3 },
+  const pages = [
+    ...PAGES,
+    ...listPosts().map((p) => ({ path: `/devlog/${p.slug}`, changeFrequency: "yearly" as Freq, priority: 0.5, lastModified: p.date })),
   ];
-  for (const p of listPosts()) {
-    pages.push({ url: `${SITE_URL}/devlog/${p.slug}`, lastModified: p.date, changeFrequency: "yearly", priority: 0.5 });
+  const out: MetadataRoute.Sitemap = [];
+  for (const page of pages) {
+    const languages = Object.fromEntries(LOCALES.map((l) => [LOCALE_TAGS[l], `${SITE_URL}${localePath(l, page.path)}`]));
+    for (const l of LOCALES) {
+      const { path, ...rest } = page;
+      out.push({ ...rest, url: `${SITE_URL}${localePath(l, path)}`, alternates: { languages } });
+    }
   }
-  return pages;
+  return out;
 }

@@ -17,6 +17,10 @@ test('public base URL never comes from the request', () => {
   expect(publicBaseUrl({ VERCEL_ENV: 'preview', VERCEL_URL: 'rosu-abc.vercel.app' })).toBe('https://rosu-abc.vercel.app')
   expect(publicBaseUrl({})).toBe('https://rosu-web.vercel.app')
   expect(statusUrl('T', 'https://x.test')).toBe('https://x.test/report/status/T')
+  // In the reporter's language when it is one the site has; anything else is English.
+  expect(statusUrl('T', 'https://x.test', 'tr')).toBe('https://x.test/tr/report/status/T')
+  expect(statusUrl('T', 'https://x.test', 'ja')).toBe('https://x.test/ja/report/status/T')
+  expect(statusUrl('T', 'https://x.test', 'de-DE')).toBe('https://x.test/report/status/T')
 })
 
 test('status update validation', () => {
