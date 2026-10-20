@@ -5,6 +5,12 @@ import { E2E_ADMIN_PATH } from '../playwright.config'
 
 /** No serious or critical WCAG 2 A/AA violations on the page as rendered. */
 async function expectAccessible(page: Page) {
+  // Contrast is measured on what is painted: let entrance animations (the
+  // screenshot cards fade in one after another) finish first. Endless ones
+  // (the floating hero card) never finish and do not change colours.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+    .map((a) => a.finished.catch(() => undefined))))
   const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   const bad = res.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
