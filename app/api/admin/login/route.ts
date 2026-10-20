@@ -1,26 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NextRequest, NextResponse } from 'next/server'
-import { passwordOk } from '@/lib/adminAuth'
-import { createSession, SESSION_COOKIE } from '@/lib/session'
+import { handleLogin } from '@/lib/adminAuth'
+import { SESSION_COOKIE, issueSession, sessionCookieOptions } from '@/lib/session'
 import { hashIp } from '@/lib/crypto'
 import { clientIp } from '@/lib/net'
-import { checkRateLimit } from '@/lib/ratelimit'
-import { getSql, countEventsSince, countAllEventsSince, recordRateEvent } from '@/lib/db'
+import { checkRateLimit, LOGIN_LIMITS } from '@/lib/ratelimit'
+import { sameOrigin, sessionStore } from '@/lib/adminGuard'
+import { getDb, countEventsSince, countAllEventsSince, recordRateEvent, loginFailuresSince, claimTotpStep, insertAudit } from '@/lib/db'
+import { requireEnv } from '@/lib/env'
 export const runtime = 'nodejs'
+
 export async function POST(req: NextRequest) {
-  const sql = getSql()
-  const ipHash = hashIp('login:' + clientIp(req), process.env.IP_HASH_SALT!)
-  const rl = await checkRateLimit(ipHash, {
-    countEventsSince: (h, s) => countEventsSince(sql, h, s),
-    countAllEventsSince: (s) => countAllEventsSince(sql, s),
-    recordRateEvent: (h) => recordRateEvent(sql, h),
-  })
-  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
-  const { password } = await req.json().catch(() => ({ password: '' }))
-  if (!passwordOk(String(password || ''), process.env.ADMIN_PASSWORD || ''))
-    return NextResponse.json({ ok: false }, { status: 401 })
-  const token = await createSession(process.env.ADMIN_SESSION_SECRET!)
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 12 })
-  return res
+  if (!sameOrigin(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+  try {
+    const sql = await getDb()
+    const ipHash = hashIp('login:' + clientIp(req), requireEnv('IP_HASH_SALT'))
+    const secret = requireEnv('ADMIN_SESSION_SECRET')
+    const body = await req.json().catch(() => ({})) as { password?: unknown; code?: unknown }
+    const result = await handleLogin({ password: body?.password, code: body?.code }, {
+      adminPassword: process.env.ADMIN_PASSWORD || '',
+      totpSecret: process.env.ADMIN_TOTP_SECRET || '',
+      checkRateLimit: () => checkRateLimit(ipHash, {
+        countEventsSince: (h, s) => countEventsSince(sql, h, s, 'login'),
+        countAllEventsSince: (s) => countAllEventsSince(sql, s, 'login'),
+        recordRateEvent: (h) => recordRateEvent(sql, h, 'login'),
+      }, Date.now(), LOGIN_LIMITS),
+      failuresSince: (since) => loginFailuresSince(sql, ipHash, since),
+      claimTotpStep: (step) => claimTotpStep(sql, step),
+      audit: (event, detail) => insertAudit(sql, event, ipHash, detail ?? null),
+      startSession: () => issueSession(sessionStore(sql, ipHash), secret),
+    })
+    const res = NextResponse.json(result.body, { status: result.status })
+    if (result.body.retry_after) res.headers.set('Retry-After', String(result.body.retry_after))
+    if (result.session) res.cookies.set(SESSION_COOKIE, result.session.token, sessionCookieOptions(result.session.maxAge))
+    return res
+  } catch {
+    return NextResponse.json({ ok: false, error: 'server' }, { status: 500 })
+  }
 }

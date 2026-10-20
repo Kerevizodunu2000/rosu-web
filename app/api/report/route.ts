@@ -2,12 +2,14 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { handleReport } from '@/lib/reportService'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { checkRateLimit } from '@/lib/ratelimit'
+import { checkRateLimit, REPORT_LIMITS, ACK_LIMITS } from '@/lib/ratelimit'
 import { runArchiveJob } from '@/lib/archiveJob'
-import { getSql, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince, countUnarchived } from '@/lib/db'
+import { getDb, insertReport, setReportImage, recordRateEvent, countEventsSince, countAllEventsSince, countUnarchived } from '@/lib/db'
 import { DriveClient } from '@/lib/drive'
 import { clientIp } from '@/lib/net'
 import { requireEnv } from '@/lib/env'
+import { newStatusToken, statusUrl } from '@/lib/reportStatus'
+import { ackConfig, sendAckEmail } from '@/lib/email'
 
 export const runtime = 'nodejs'
 
@@ -30,20 +32,21 @@ export async function POST(req: NextRequest) {
   let raw: unknown
   try { raw = await req.json() } catch { return NextResponse.json({ ok: false, error: 'bad_json' }, { status: 400 }) }
 
-  const sql = getSql()
   const rootName = process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'Rosu Reports'
+  const ack = ackConfig()
 
   try {
+    const sql = await getDb()
     const result = await handleReport({
       raw, ip: clientIp(req), userAgent: req.headers.get('user-agent') || '',
       deps: {
         salt: requireEnv('IP_HASH_SALT'), appToken: process.env.REPORT_APP_TOKEN || '', turnstileSecret: requireEnv('TURNSTILE_SECRET_KEY'),
         verifyTurnstile,
         checkRateLimit: (ipHash) => checkRateLimit(ipHash, {
-          countEventsSince: (ip, since) => countEventsSince(sql, ip, since),
-          countAllEventsSince: (since) => countAllEventsSince(sql, since),
-          recordRateEvent: (ip) => recordRateEvent(sql, ip),
-        }),
+          countEventsSince: (ip, since) => countEventsSince(sql, ip, since, 'report'),
+          countAllEventsSince: (since) => countAllEventsSince(sql, since, 'report'),
+          recordRateEvent: (ip) => recordRateEvent(sql, ip, 'report'),
+        }, Date.now(), REPORT_LIMITS),
         insertReport: (r) => insertReport(sql, r),
         setReportImage: (id, v) => setReportImage(sql, id, v),
         uploadImage: async (img) => {
@@ -52,8 +55,20 @@ export async function POST(req: NextRequest) {
           const inbox = await drive.ensureFolder('Inbox', root)
           return drive.uploadFile({ ...img, parent: inbox })
         },
+        newStatusToken,
+        statusUrl: (token) => statusUrl(token),
+        ackEmailEnabled: ack !== null,
+        allowAck: async (ipHash) => (await checkRateLimit(ipHash, {
+          countEventsSince: (ip, since) => countEventsSince(sql, ip, since, 'ack'),
+          countAllEventsSince: (since) => countAllEventsSince(sql, since, 'ack'),
+          recordRateEvent: (ip) => recordRateEvent(sql, ip, 'ack'),
+        }, Date.now(), ACK_LIMITS)).allowed,
       },
     })
+    const ackEmail = result.followUp?.ackEmail
+    if (ack && ackEmail) {
+      after(async () => { await sendAckEmail(ack, ackEmail.to, ackEmail) })
+    }
     // Threshold auto-archive: once enough reports pile up, bundle them to Drive
     // right away instead of waiting for the nightly cron (which stays as the
     // backstop). Runs after the response is sent; best-effort — a rare

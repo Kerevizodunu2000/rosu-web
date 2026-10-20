@@ -85,10 +85,13 @@ function IconCheck() {
   );
 }
 
-export default function ReportForm() {
+export default function ReportForm({ ackEmailAvailable = false }: { ackEmailAvailable?: boolean }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
+  const [ackEmail, setAckEmail] = useState(false);
+  const [statusUrl, setStatusUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [hp, setHp] = useState(""); // honeypot — real users never fill this in
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -187,6 +190,7 @@ export default function ReportForm() {
       hp,
       turnstileToken,
     };
+    if (ackEmailAvailable && ackEmail && contact.trim()) payload.ack_email = true;
     if (screenshot) {
       payload.image_b64 = screenshot.b64;
       payload.image_mime = screenshot.mime;
@@ -199,9 +203,10 @@ export default function ReportForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; status_url?: string } | null;
 
       if (data?.ok) {
+        setStatusUrl(typeof data.status_url === "string" ? data.status_url : null);
         setStatus("success");
         return;
       }
@@ -232,6 +237,36 @@ export default function ReportForm() {
             ? "We'll reply to the email you left if we need more details or have an update."
             : "Leave a contact email next time if you'd like a reply from us."}
         </p>
+        {statusUrl && (
+          <div className="mx-auto mt-6 max-w-md rounded-xl border border-border bg-bg p-4 text-left">
+            <p className="text-sm font-medium text-fg">Track this report</p>
+            <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+              Save this private link to see when it&apos;s in review or fixed. It&apos;s shown only once.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <a
+                href={statusUrl}
+                className="min-w-0 flex-1 truncate font-mono text-xs text-accent-2 underline underline-offset-2"
+              >
+                {statusUrl}
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(statusUrl);
+                    setCopied(true);
+                  } catch {
+                    setCopied(false);
+                  }
+                }}
+                className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
+              >
+                {copied ? "Copied" : "Copy link"}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <a href="/report" className="btn btn-primary">
             Send another report
@@ -375,6 +410,21 @@ export default function ReportForm() {
             className="field-input mt-1.5"
           />
           <p className="field-hint">So we can reply if we have a question or a fix. Never shared publicly or sold.</p>
+          {ackEmailAvailable && (
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-fg-muted">
+              <input
+                type="checkbox"
+                checked={ackEmail}
+                onChange={(e) => setAckEmail(e.target.checked)}
+                disabled={!contact.trim()}
+                className="mt-0.5 h-4 w-4 accent-[var(--color-accent-2)]"
+              />
+              <span>
+                E-mail me a confirmation with the tracking link{" "}
+                <span className="text-fg-muted/80">(one message, nothing else)</span>
+              </span>
+            </label>
+          )}
         </div>
 
         {SITE_KEY && (

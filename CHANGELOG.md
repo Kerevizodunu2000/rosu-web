@@ -10,7 +10,55 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-20
+
+Security & platform release.
+
+### Added
+- **Report status tracking** — every report now gets a private, unguessable tracking
+  link (`/report/status/<token>`, no account needed) showing *received → in review →
+  fixed in vX* plus an optional public note. Only a SHA-256 of the token is stored.
+  `POST /api/report` returns it as `status_url` (backward compatible for the desktop
+  app); the web form shows it with a copy button. The admin panel gains a per-report
+  status editor.
+- **Opt-in confirmation e-mail** (Resend) with the tracking link. Off unless
+  `RESEND_API_KEY` and `ACK_EMAIL_FROM` are both set; never echoes anything the
+  reporter typed; its own tight rate budget (3/day per address, 50/day overall).
+- **`GET /api/latest-version`** — the latest desktop release (version, release page,
+  `.exe` + `.sha256` download URLs, release-notes excerpt) from GitHub Releases,
+  CDN-cached, for the app's update check.
+- **`POST /api/crash`** — opt-in crash fingerprints from the desktop app (shared
+  token + rate limit). The server scrubs paths and e-mail addresses, computes the
+  fingerprint itself, and the admin panel groups identical crashes with a
+  distinct-users count.
+- **Admin two-factor sign-in** (TOTP, RFC 6238) via `ADMIN_TOTP_SECRET`; each code is
+  accepted once. `scripts/totp-setup.mjs` generates the secret.
+- **Secret admin path** (`ADMIN_PATH`): the panel moves to `/<slug>` and `/admin` +
+  `/api/admin/*` answer 404.
+- **Progressive login lockout** (30 s, doubling, max 15 min per address) on top of the
+  per-IP rate limit.
+- **Admin audit log** (Neon) of sign-ins, lockouts, logouts, archive runs, status
+  changes and retention sweeps, shown in the panel with a security summary.
+- **Cron watchdog** — the nightly job pings `HEALTHCHECKS_PING_URL` on success and
+  `/fail` on error.
+
 ### Changed
+- **12-month retention is now enforced**: the nightly job deletes archive ZIPs, archived
+  report rows, crash data and audit entries older than twelve months, as `/privacy`
+  promises. The policy (EN + TR) now also covers tracking links, confirmation e-mails
+  (Resend) and opt-in crash reports.
+- **Admin sessions are server-side**: the cookie (`__Host-`, `SameSite=Strict`) carries
+  a random session id stored in Neon — logout and "sign out everywhere" revoke it;
+  idle timeout 2 h, absolute 12 h, rotated every 15 minutes of use. Existing sessions
+  are signed out once by this upgrade.
+- Admin API calls check the request `Origin` (defence in depth against CSRF).
+- Rate-limit events carry a `kind`, so login, report, crash and e-mail budgets no
+  longer share one global counter (login spam could previously exhaust the global
+  report budget).
+- The schema lives in `db/schema.mjs` and the app applies it itself on first use
+  (idempotent, advisory-locked), so a deploy cannot run against missing columns;
+  `npm run migrate` uses the same statements.
+- The admin image proxy sends a sandboxing `Content-Security-Policy`.
 - The "A look inside" screenshots section now states which desktop release the
   screenshots were captured from (Rosu v1.3.3), with a version chip next to the
   heading.
@@ -127,7 +175,8 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.0.0...v1.1.0

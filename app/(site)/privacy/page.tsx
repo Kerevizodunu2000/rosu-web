@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 // Keep this date in sync with the "Last updated" lines below when the policy changes.
-const LAST_UPDATED = "2026-07-18";
+const LAST_UPDATED = "2026-10-20";
 
 export default function PrivacyPage() {
   return (
@@ -65,21 +65,30 @@ export default function PrivacyPage() {
           version, your operating system, and the app&apos;s interface language). On our server we
           store a <strong className="text-fg">salted, hashed</strong> form of your IP address to
           limit spam — we never store your raw IP. The web form uses Cloudflare Turnstile (an
-          anti-spam check), which may set a cookie and process connection metadata.
+          anti-spam check), which may set a cookie and process connection metadata. Each report gets
+          a private <strong className="text-fg">tracking link</strong> so you can see its status; we
+          keep only a hash of that link, never the link itself. If you tick &ldquo;e-mail me a
+          confirmation&rdquo;, we send one message with that link to the address you gave. If you turn
+          on <strong className="text-fg">crash reports</strong> in the Rosu app, a crash sends the
+          error type, a short error message with file paths and e-mail addresses removed, the names
+          of the code locations involved, the Rosu version and your operating system — no files,
+          no library contents, no usernames.
         </PolicyBlock>
 
         <PolicyBlock title="Why (lawful basis)">
           Your report (title and description) and the diagnostics, together with the hashed IP, are
           processed under our <em>legitimate interest</em> in fixing bugs and preventing abuse. The
-          optional contact email and screenshot are processed with your <em>consent</em> — you decide
-          whether to include them, and you can withdraw that consent at any time by asking us to
-          delete your report.
+          optional contact email, screenshot, confirmation e-mail and crash reports are processed with
+          your <em>consent</em> — you decide whether to include or enable them, and you can withdraw
+          that consent at any time by asking us to delete your data (or by turning crash reports off
+          in the app).
         </PolicyBlock>
 
         <PolicyBlock title="Where it goes">
           Reports are stored in a hosted database (Neon), and any screenshot is stored on the
           maintainer&apos;s private Google Drive; working copies are moved into periodic archives
-          automatically. These providers (Neon, Google, Cloudflare, and our host Vercel) are based in
+          automatically. A confirmation e-mail, if you ask for one, is delivered through Resend. These
+          providers (Neon, Google, Cloudflare, Resend, and our host Vercel) are based in
           the United States, so your data is processed outside your country — including outside the
           EU/EEA and Turkey — under those providers&apos; standard data-protection terms (such as the
           EU Standard Contractual Clauses). We don&apos;t sell your data, show ads, or use third-party
@@ -88,8 +97,10 @@ export default function PrivacyPage() {
 
         <PolicyBlock title="Retention">
           Reports and screenshots are moved into periodic archives on the maintainer&apos;s private
-          Google Drive; working copies are removed once archived. We delete them on request (see
-          below) and aim to remove archives older than <strong className="text-fg">12 months</strong>.
+          Google Drive; working copies are removed once archived. Reports, archives, crash reports and
+          the admin activity log are <strong className="text-fg">deleted automatically after 12
+          months</strong> by a nightly job, and sooner on request (see below). Hashed IP addresses used
+          for rate limiting are kept for two days.
         </PolicyBlock>
 
         <PolicyBlock title="Your choices">
@@ -152,21 +163,30 @@ export default function PrivacyPage() {
           <strong className="text-fg">tuzlanmış (salted) ve hash&apos;lenmiş</strong> bir hâlini
           saklarız — ham IP adresini asla saklamayız. Web formu, Cloudflare Turnstile (spam-önleyici
           bir doğrulama) kullanır; bu, bir çerez ayarlayabilir ve bağlantı meta verilerini
-          işleyebilir.
+          işleyebilir. Her rapor için durumunu görebileceğin özel bir{" "}
+          <strong className="text-fg">takip bağlantısı</strong> oluşturulur; bağlantının kendisini
+          değil, yalnızca hash&apos;ini saklarız. &ldquo;Bana onay e-postası gönder&rdquo; kutusunu
+          işaretlersen, verdiğin adrese bu bağlantıyı içeren tek bir e-posta göndeririz. Rosu
+          uygulamasında <strong className="text-fg">çökme raporlarını</strong> açarsan, bir çökme;
+          hata türünü, dosya yolları ve e-posta adresleri temizlenmiş kısa bir hata mesajını, ilgili
+          kod konumlarının adlarını, Rosu sürümünü ve işletim sistemini gönderir — dosya, kütüphane
+          içeriği veya kullanıcı adı gönderilmez.
         </PolicyBlock>
 
         <PolicyBlock title="Neden (hukuki dayanak)">
           Raporun (başlık ve açıklama) ve tanılama bilgileri, hash&apos;lenmiş IP ile birlikte,
           hataları düzeltme ve kötüye kullanımı önleme yönündeki <em>meşru menfaatimiz</em> kapsamında
-          işlenir. İsteğe bağlı iletişim e-postası ve ekran görüntüsü, <em>açık rızanla</em> işlenir —
-          bunları eklemek senin tercihindir ve raporunun silinmesini isteyerek rızanı istediğin zaman
+          işlenir. İsteğe bağlı iletişim e-postası, ekran görüntüsü, onay e-postası ve çökme raporları{" "}
+          <em>açık rızanla</em> işlenir — bunları eklemek veya açmak senin tercihindir; verilerinin
+          silinmesini isteyerek (ya da çökme raporlarını uygulamada kapatarak) rızanı istediğin zaman
           geri çekebilirsin.
         </PolicyBlock>
 
         <PolicyBlock title="Nerede saklanır">
           Raporlar barındırılan bir veritabanında (Neon), ekran görüntüleri ise geliştiricinin özel
           Google Drive&apos;ında saklanır; çalışma kopyaları düzenli olarak otomatik arşivlere taşınır.
-          Bu sağlayıcılar (Neon, Google, Cloudflare ve barındırıcımız Vercel) ABD merkezlidir; bu
+          İstersen gönderilen onay e-postası Resend üzerinden iletilir. Bu sağlayıcılar (Neon, Google,
+          Cloudflare, Resend ve barındırıcımız Vercel) ABD merkezlidir; bu
           nedenle verilerin, bu sağlayıcıların standart veri koruma şartları (ör. AB Standart Sözleşme
           Hükümleri) kapsamında ülkenin dışında — AB/AEA ve Türkiye dışı dâhil — işlenir. Verilerini
           satmayız, reklam göstermeyiz, üçüncü taraf analiz/izleme kullanmayız.
@@ -174,9 +194,11 @@ export default function PrivacyPage() {
 
         <PolicyBlock title="Saklama süresi">
           Raporlar ve ekran görüntüleri, geliştiricinin özel Google Drive&apos;ındaki düzenli
-          arşivlere taşınır; çalışma kopyaları arşivlendikten sonra silinir. Bunları talep üzerine
-          sileriz (aşağıya bak) ve <strong className="text-fg">12 aydan</strong> eski arşivleri
-          kaldırmayı hedefleriz.
+          arşivlere taşınır; çalışma kopyaları arşivlendikten sonra silinir. Raporlar, arşivler, çökme
+          raporları ve yönetici etkinlik kaydı her gece çalışan bir işle{" "}
+          <strong className="text-fg">12 ay sonra otomatik olarak silinir</strong>; talep edersen daha
+          önce sileriz (aşağıya bak). Hız sınırlaması için kullanılan hash&apos;lenmiş IP adresleri iki
+          gün saklanır.
         </PolicyBlock>
 
         <PolicyBlock title="Seçeneklerin">
