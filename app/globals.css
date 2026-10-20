@@ -14,6 +14,9 @@
   --accent-2: #ff2e97;
   --accent-rose: #e0405e; /* secondary/deep accent */
   --on-accent: #211f2b; /* ink text color used on top of the accent gradient, constant across themes */
+  /* Accent as TEXT (links, small labels): the bright brand pink is under 4.5:1 on
+     the light surfaces, so text uses a deeper shade there (5.7:1 on white). */
+  --accent-ink: #c4166b;
 
   /* Surfaces + text (light) */
   --bg: #f4f3f9;
@@ -33,6 +36,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --accent-ink: #ff66aa;
     --bg: #121019;
     --bg-glow: rgba(255, 102, 170, 0.24);
     --surface: #1b1926;
@@ -287,4 +291,11 @@ body {
 }
 .card-swap {
   animation: card-swap 420ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+/* Accent-coloured TEXT goes through the contrast-safe ink token (see :root).
+   Unlayered, so it wins over the Tailwind utility of the same name; backgrounds,
+   borders and gradients keep the bright brand pink. */
+.text-accent-2 {
+  color: var(--accent-ink);
 }

@@ -57,3 +57,11 @@ test('latestReleaseCached hits upstream at most once per TTL and keeps the last 
   expect(calls).toBe(3)
   _resetReleaseMemo()
 })
+
+test('release list keeps published releases with their notes', async () => {
+  const { parseReleaseList } = await import('@/lib/releases')
+  const list = parseReleaseList([{ ...gh, body: 'notes' }, { ...gh, tag_name: 'v1.8.0', draft: true }, 'junk'])
+  expect(list.map((r) => r.tag)).toEqual(['v1.7.1'])
+  expect(list[0].body).toBe('notes')
+  expect(parseReleaseList({ not: 'a list' })).toEqual([])
+})

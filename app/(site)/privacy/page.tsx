@@ -41,7 +41,7 @@ export default function PrivacyPage() {
         </p>
 
         <p className="mt-6 leading-relaxed text-fg-muted">
-          Rosu is a free, open-source (GPL-3.0), <strong className="text-fg">unofficial</strong>{" "}
+          Rosu is a free, open-source (GPL-3.0-or-later), <strong className="text-fg">unofficial</strong>{" "}
           fan-made tool for managing osu! beatmap archives. It is{" "}
           <strong className="text-fg">not affiliated with or endorsed by ppy Pty Ltd / osu!</strong>.
           This policy covers the Rosu website and the optional in-app{" "}
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
         </p>
 
         <p className="mt-6 leading-relaxed text-fg-muted">
-          Rosu; osu! beatmap arşivlerini yöneten, ücretsiz, açık kaynak (GPL-3.0) ve{" "}
+          Rosu; osu! beatmap arşivlerini yöneten, ücretsiz, açık kaynak (GPL-3.0-or-later) ve{" "}
           <strong className="text-fg">resmî olmayan</strong>, hayran yapımı bir araçtır.{" "}
           <strong className="text-fg">
             ppy Pty Ltd / osu! ile bağlantılı veya onlar tarafından onaylanmış değildir.

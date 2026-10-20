@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 const SITE_DESCRIPTION =
-  "Rosu unpacks osu! beatmap packs, dedupes them into one tidy Library, and imports into osu!(stable) or lazer. Free, open-source (GPL-3.0), Windows.";
+  "Rosu unpacks osu! beatmap packs, dedupes them into one tidy Library, and imports into osu!(stable) or lazer. Free, open-source (GPL-3.0-or-later), Windows.";
 const SITE_TITLE = "Rosu — osu! beatmap-pack archive manager";
 
 export const metadata: Metadata = {
@@ -29,13 +29,12 @@ export const metadata: Metadata = {
     siteName: "Rosu",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [{ url: "/screenshots/dashboard.png", width: 1278, height: 918, alt: "The Rosu dashboard" }],
+    // Image: app/opengraph-image.tsx (generated) — a page can override it.
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: ["/screenshots/dashboard.png"],
   },
 };
 

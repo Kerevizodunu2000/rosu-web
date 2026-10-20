@@ -66,7 +66,11 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 
 | Route | What |
 |---|---|
-| `/` | Landing page (screenshots open in an accessible lightbox) |
+| `/` | Landing page (screenshots open in an accessible lightbox; schema.org JSON-LD) |
+| `/changelog` | Every desktop release from GitHub Releases (rebuilt hourly) |
+| `/docs`, `/docs/api` | User guide · the public API contract the desktop app uses |
+| `/devlog` | Development notes (Markdown posts in `content/devlog/posts.ts`) |
+| `/status` | Live health of the site, report intake and update check |
 | `/report` | Report / contact form (Turnstile-protected) |
 | `/privacy` | Privacy Policy — bilingual (EN + TR) |
 | `/terms` | Terms — bilingual (EN + TR) |
@@ -74,6 +78,7 @@ Everything runs on **free, no-credit-card, never-sleeping** infrastructure.
 | `/admin` | Submissions, status updates, crash groups, activity log (password + optional TOTP; can live under a secret `ADMIN_PATH`) |
 | `POST /api/report` | Accepts the desktop app **and** the web form; returns `{ ok, id, status_url }` |
 | `POST /api/crash` | Opt-in crash fingerprints from the desktop app (token + rate limit, scrubbed server-side) |
+| `GET /api/health` | `{ ok, db }` for uptime monitors (503 when the database is down) |
 | `GET /api/latest-version` | Latest desktop release (version, download + SHA-256 URLs, notes) for the in-app update check; CDN-cached |
 | `GET /api/cron/archive` | Nightly job: archive → 12-month retention → watchdog ping (Vercel Cron) |
 | `POST /api/admin/{login,logout,archive,status}` | Admin session, manual archive, report status |
@@ -86,7 +91,8 @@ npm install
 cp .env.example .env.local      # then fill in the values (see below)
 npm run migrate                 # optional: create/upgrade the Neon tables up front (the app also does it on first use)
 npm run dev                     # http://localhost:3000
-npm run test                    # Vitest
+npm run test                    # Vitest (unit)
+npm run build && npm run e2e    # Playwright smoke + axe accessibility checks (needs a Chromium: npx playwright install chromium)
 ```
 
 ### Environment variables

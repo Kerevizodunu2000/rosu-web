@@ -80,3 +80,35 @@ export async function fetchLatestRelease(fetchImpl: typeof fetch = fetch, token 
   if (!res.ok) return null
   return parseLatestRelease(await res.json())
 }
+
+export type ReleaseEntry = LatestVersion & { body: string }
+export const BODY_MAX = 20_000
+
+/** Published releases, newest first (drafts and pre-releases skipped). */
+export function parseReleaseList(json: unknown): ReleaseEntry[] {
+  if (!Array.isArray(json)) return []
+  const out: ReleaseEntry[] = []
+  for (const r of json) {
+    const v = parseLatestRelease(r)
+    if (!v) continue
+    const body = typeof (r as { body?: unknown }).body === 'string' ? (r as { body: string }).body : ''
+    out.push({ ...v, body: body.replace(/\r\n/g, '\n').slice(0, BODY_MAX) })
+  }
+  return out
+}
+
+export async function fetchReleases(fetchImpl: typeof fetch = fetch, token = process.env.GITHUB_TOKEN): Promise<ReleaseEntry[] | null> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'rosu-web (+https://rosu-web.vercel.app)',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  try {
+    const res = await fetchImpl(RELEASES_API.replace(/\/latest$/, '?per_page=30'), {
+      headers, signal: AbortSignal.timeout(8000), next: { revalidate: 3600 },
+    } as RequestInit)
+    if (!res.ok) return null
+    return parseReleaseList(await res.json())
+  } catch { return null }
+}

@@ -6,7 +6,7 @@ import { CONTACT_EMAIL, GITHUB_URL, PRIVACY_PATH } from "@/lib/links";
 export const metadata: Metadata = {
   title: "Terms — Rosu",
   description:
-    "The short, plain terms for using Rosu and the rosu-web site: provided as-is, GPL-3.0, unofficial and non-commercial. English + Türkçe.",
+    "The short, plain terms for using Rosu and the rosu-web site: provided as-is, GPL-3.0-or-later, unofficial and non-commercial. English + Türkçe.",
 };
 
 const LAST_UPDATED = "2026-07-18";
@@ -44,7 +44,7 @@ export default function TermsPage() {
             for any loss or damage arising from their use.
           </li>
           <li>
-            <strong className="text-fg">Open source (GPL-3.0).</strong> Rosu is free software under
+            <strong className="text-fg">Open source (GPL-3.0-or-later).</strong> Rosu is free software under
             the GNU General Public License v3.0-or-later. The source is public on{" "}
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-accent-2 underline underline-offset-2">
               GitHub
@@ -92,7 +92,7 @@ export default function TermsPage() {
             herhangi bir zarardan sorumlu değildir.
           </li>
           <li>
-            <strong className="text-fg">Açık kaynak (GPL-3.0).</strong> Rosu, GNU Genel Kamu Lisansı
+            <strong className="text-fg">Açık kaynak (GPL-3.0-or-later).</strong> Rosu, GNU Genel Kamu Lisansı
             v3.0-veya-sonrası kapsamında özgür bir yazılımdır. Kaynak kodu{" "}
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-accent-2 underline underline-offset-2">
               GitHub

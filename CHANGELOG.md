@@ -10,6 +10,53 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-20
+
+Quality & visibility release.
+
+### Added
+- **`/changelog`** — every desktop release from GitHub Releases (notes, download, release
+  page), rebuilt at most hourly.
+- **`/docs`** (user guide) and **`/docs/api`** (the public contract of `/api/report`,
+  `/api/crash`, `/api/latest-version` and `/api/health`).
+- **`/devlog`** with a first post, *A zero-budget bug-report pipeline*. Posts are plain
+  Markdown in `content/devlog/posts.ts`, rendered by a small built-in Markdown subset
+  that never passes HTML through and only allows http(s)/relative links.
+- **`/status`** page and **`GET /api/health`** (`{ ok, db }`, 503 when the database is
+  down) for uptime monitors.
+- **SEO**: `sitemap.xml`, `robots.txt` (keeps `/admin`, `/api/` and status links out of
+  search), schema.org `SoftwareApplication` JSON-LD, and a generated **social card**
+  (`opengraph-image` / `twitter-image`) instead of a cropped screenshot.
+- **CI** (GitHub Actions): lint, unit tests, production build and a production-dependency
+  audit gate on every push/PR, plus a **Playwright** job running end-to-end smoke tests
+  and **axe** accessibility checks (WCAG 2 A/AA, serious+critical) on every public page,
+  the report form's failure path and the secret admin path.
+- **Dependabot** for npm (grouped minor/patch, weekly) and GitHub Actions (monthly).
+
+### Changed
+- Accent-coloured text uses a deeper pink in light mode (5.7:1 on white, was ~3.4:1);
+  backgrounds and gradients keep the bright brand pink.
+- The navigation has one list of links (Features, Changelog, Docs, Report a problem)
+  rendered for both layouts; the footer links the devlog and status pages.
+- The footer year is read in the browser, so it no longer freezes at the build year.
+- Licence wording is "GPL-3.0-or-later" everywhere.
+
+### Fixed
+- Code blocks are keyboard-scrollable, and the screenshot-carousel dots are a plain
+  button group instead of an incomplete tab list (both flagged by axe).
+- The footer logo is no longer preloaded as if it were above the fold.
+- Lint is clean (the lightbox no longer writes a ref during render).
+
+### Removed
+- Unused `public/rosu-mark-outline.svg`, `public/rosu-splash.png` and the unused
+  gradients/symbol inside `rosu-mark.svg`.
+
+### Security
+- **Next.js 16.2.10 → 16.4.2**, which fixes a set of critical advisories in the version
+  in production (including a Proxy bypass, RCE in the Image Optimization API and in
+  `next/og`, cache poisoning and SSRF). Vulnerable transitive `nanoid`, `source-map-js`
+  and `baseline-browser-mapping` are pinned to fixed versions via `overrides`.
+
 ## [1.3.0] - 2026-10-20
 
 Security & platform release.
@@ -191,7 +238,8 @@ First public release. Live at <https://rosu-web.vercel.app>.
   server-generated filenames. Raw IPs are never stored (salted hash only).
 - Test suite (Vitest), GPL-3.0-or-later license, and project documentation.
 
-[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Kerevizodunu2000/rosu-web/compare/v1.1.0...v1.2.0
