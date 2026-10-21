@@ -31,7 +31,7 @@ export const en = {
   },
   footer: {
     blurb:
-      'Rosu is free, open-source (GPL-3.0-or-later), donation-only and non-commercial. Unofficial, fan-made — not affiliated with or endorsed by ppy Pty Ltd or osu!.',
+      'Rosu is free, open-source (GPL-3.0-or-later), non-commercial and takes no money (no sales, no donations). Unofficial, fan-made — not affiliated with or endorsed by ppy Pty Ltd or osu!.',
     privacy: 'Privacy',
     terms: 'Terms',
     devlog: 'Devlog',

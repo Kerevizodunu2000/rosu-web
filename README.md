@@ -163,4 +163,4 @@ through [SECURITY.md](./SECURITY.md) (privately — never a public issue).
 
 ---
 
-Rosu is **free, open-source, donation-only and non-commercial**. It is an **unofficial, fan-made tool — not affiliated with or endorsed by ppy Pty Ltd or osu!**. Contact: **rosu.app@gmail.com**
+Rosu is **free, open-source and non-commercial — it takes no money (no sales, no donations)**. It is an **unofficial, fan-made tool — not affiliated with or endorsed by ppy Pty Ltd or osu!**. Contact: **rosu.app@gmail.com**

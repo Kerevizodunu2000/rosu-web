@@ -26,7 +26,7 @@ current release receives fixes.
   if you prefer.
 
 You can expect an acknowledgement within **72 hours** and a status update within
-**7 days**. This is a free, donation-only fan project maintained by one person —
+**7 days**. This is a free, non-commercial fan project maintained by one person —
 there is **no bug bounty**, but you'll be credited in the changelog/release notes
 if you'd like.
 

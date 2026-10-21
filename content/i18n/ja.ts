@@ -29,7 +29,7 @@ export const ja: Dict = {
   },
   footer: {
     blurb:
-      'Rosu は無料・オープンソース（GPL-3.0-or-later）で、寄付のみで運営される非営利プロジェクトです。非公式のファンメイドであり、ppy Pty Ltd および osu! とは提携・承認関係にありません。',
+      'Rosu は無料・オープンソース（GPL-3.0-or-later）で、販売も寄付も一切受け付けない非営利プロジェクトです。非公式のファンメイドであり、ppy Pty Ltd および osu! とは提携・承認関係にありません。',
     privacy: 'プライバシー',
     terms: '利用規約',
     devlog: '開発ログ',

@@ -61,7 +61,7 @@ export default function TermsView({ locale }: { locale: Locale }) {
           </li>
           <li>
             <strong className="text-fg">Unofficial &amp; non-commercial.</strong> Rosu is an
-            unofficial, fan-made, donation-only project — <strong className="text-fg">not affiliated
+            unofficial, fan-made project that takes no money (no sales, no donations) — <strong className="text-fg">not affiliated
             with or endorsed by ppy Pty Ltd or osu!</strong>. &ldquo;osu!&rdquo; is used only to
             describe what the tool works with.
           </li>
@@ -110,7 +110,7 @@ export default function TermsView({ locale }: { locale: Locale }) {
           </li>
           <li>
             <strong className="text-fg">Resmî değil &amp; ticari değil.</strong> Rosu; resmî olmayan,
-            hayran yapımı, yalnızca bağışa dayalı bir projedir —{" "}
+            hayran yapımı ve hiçbir şekilde para almayan (satış yok, bağış yok) bir projedir —{" "}
             <strong className="text-fg">ppy Pty Ltd veya osu! ile bağlantılı ya da onaylı değildir</strong>.
             &ldquo;osu!&rdquo; adı yalnızca aracın neyle çalıştığını tanımlamak için kullanılır.
           </li>

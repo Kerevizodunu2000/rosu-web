@@ -54,8 +54,8 @@ Rosu is a **Windows desktop app** (Python 3.13 / PySide6 / SQLite, shipped as a
 single PyInstaller `rosu.exe`). It manages **osu!** beatmap pack archives:
 unpack packs, dedup beatmapsets into a permanent Library, track everything in a
 local SQLite DB, detect missing packs, import into osu!(stable)/osu!lazer, back
-up to Google Drive. It's **free, open-source (GPL-3.0-or-later), donation-only,
-non-commercial** (never paywalled). Official contact e-mail: **rosu.app@gmail.com**.
+up to Google Drive. It's **free, open-source (GPL-3.0-or-later), non-commercial,
+takes no money** (no sales, no donations, never paywalled). Official contact e-mail: **rosu.app@gmail.com**.
 
 **Brand:** Rosu's accent color is **pink**. **Do NOT use ppy's osu! logo or
 "osu!" branding as if official — it's a trademark.** Rosu is an unofficial,
