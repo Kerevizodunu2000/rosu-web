@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { ReportRecord, ReportStatus } from "@/lib/db";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS, NOTE_MAX, BULK_MAX } from "@/lib/reportStatus";
+import { mailtoHref } from "@/lib/validation";
 import { adminHref, formatAdminDate, pageCount, PAGE_SIZE, Q_MAX, type AdminQuery } from "@/lib/adminQuery";
 
 type ArchiveResponse = { ok?: boolean; archived?: number; archiveName?: string };
@@ -542,9 +543,13 @@ export default function AdminTable({
                     </td>
                     <td className="px-3 py-3 text-sm text-fg-muted">
                       {r.contact ? (
-                        <a href={`mailto:${r.contact}`} className="hover:text-accent-ink hover:underline">
-                          {r.contact}
-                        </a>
+                        mailtoHref(r.contact) ? (
+                          <a href={mailtoHref(r.contact)!} className="hover:text-accent-ink hover:underline">
+                            {r.contact}
+                          </a>
+                        ) : (
+                          r.contact
+                        )
                       ) : (
                         "—"
                       )}

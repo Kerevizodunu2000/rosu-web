@@ -24,6 +24,15 @@ export type ParsedReport = {
 const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
 export const isEmail = (v: string) => v.length <= LIMITS.contact && EMAIL_RE.test(v)
 
+/** A safe mailto: link for a contact that is an e-mail address, else null.
+ *  isEmail still allows ? & = # %, so each side of the @ is percent-encoded
+ *  and the contact cannot add headers such as cc or body. */
+export function mailtoHref(contact: string): string | null {
+  if (!isEmail(contact)) return null
+  const [local, domain] = contact.split('@')
+  return `mailto:${encodeURIComponent(local)}@${encodeURIComponent(domain)}`
+}
+
 const s = (v: unknown) => (typeof v === 'string' ? v : '')
 const clip = (v: unknown, n: number) => s(v).slice(0, n)
 
