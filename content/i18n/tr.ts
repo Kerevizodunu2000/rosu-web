@@ -29,7 +29,7 @@ export const tr: Dict = {
   },
   footer: {
     blurb:
-      "Rosu ücretsiz, açık kaynak (GPL-3.0-or-later), yalnızca bağışla desteklenen ve ticari olmayan bir projedir. Resmî değildir, hayran yapımıdır — ppy Pty Ltd ya da osu! ile bağlantılı değildir ve onlar tarafından desteklenmez.",
+      "Rosu ücretsiz, açık kaynak (GPL-3.0-or-later), ticari olmayan ve hiçbir şekilde para almayan (satış yok, bağış yok) bir projedir. Resmî değildir, hayran yapımıdır — ppy Pty Ltd ya da osu! ile bağlantılı değildir ve onlar tarafından desteklenmez.",
     privacy: 'Gizlilik',
     terms: 'Koşullar',
     devlog: 'Geliştirici günlüğü',

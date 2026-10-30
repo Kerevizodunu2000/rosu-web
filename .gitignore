@@ -50,3 +50,7 @@ Thumbs.db
 report-live.png
 /app-img/
 AGENTS.md
+
+# Software factory runtime state (see factory/ and .claude/skills/factory)
+/factory/jobs/
+/factory/.github-cache/
