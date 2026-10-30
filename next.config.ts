@@ -14,6 +14,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    // 652 = the hero at 372 CSS px on a 1.75x phone; the default list jumps 640 to 750.
+    deviceSizes: [640, 652, 750, 828, 1080, 1200, 1920, 2048, 3840],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

@@ -27,6 +27,9 @@ Work toward **2.0 "Brand & Show"**.
 - A 404 page in all three languages.
 
 ### Changed
+- **Faster landing page on mobile.** Only the main font (with Turkish letters) is preloaded,
+  Japanese text uses the system font, and screenshots are served as AVIF at the size they
+  are shown.
 - The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song
   detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
   and the update check only asks for the latest version number.
