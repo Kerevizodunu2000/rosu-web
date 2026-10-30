@@ -15,7 +15,7 @@ export function DocsView({ locale }: { locale: Locale }) {
         {before}<span className="text-gradient-accent">Rosu</span>{after}
       </h1>
       <p className="mt-3 text-fg-muted"><Rich text={t.docs.intro} locale={locale} /></p>
-      <Markdown source={GUIDES[locale]} locale={locale} className="mt-6" />
+      <Markdown source={GUIDES[locale]} locale={locale} className="mt-6" headingOffset={0} />
     </section>
   );
 }
@@ -29,7 +29,7 @@ export function ApiDocsView({ locale }: { locale: Locale }) {
         <span className="text-gradient-accent">{t.docs.apiTitle}</span>
       </h1>
       {locale !== "en" && <p className="mt-3 text-sm text-fg-muted">{t.common.englishOnly}</p>}
-      <div lang="en"><Markdown source={API} locale={locale} className="mt-4" /></div>
+      <div lang="en"><Markdown source={API} locale={locale} className="mt-4" headingOffset={0} /></div>
     </section>
   );
 }
