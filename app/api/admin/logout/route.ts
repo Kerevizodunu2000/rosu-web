@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/adminGuard'
 import { insertAudit, revokeAdminSessionFamily, revokeAllAdminSessions } from '@/lib/db'
 import { hashIp } from '@/lib/crypto'
 import { rateIp } from '@/lib/net'
+import { requireEnv } from '@/lib/env'
 export const runtime = 'nodejs'
 
 /**
@@ -22,8 +23,9 @@ export async function POST(req: NextRequest) {
     return res
   }
   const body = await req.json().catch(() => ({})) as { all?: unknown }
-  const ipHash = hashIp('login:' + rateIp(req), process.env.IP_HASH_SALT || '')
   try {
+    // A missing salt fails closed before anything is revoked (never an empty-salt hash).
+    const ipHash = hashIp('login:' + rateIp(req), requireEnv('IP_HASH_SALT'))
     if (body?.all === true) {
       const n = await revokeAllAdminSessions(admin.sql)
       await insertAudit(admin.sql, 'logout_all', ipHash, `revoked=${n}`)
