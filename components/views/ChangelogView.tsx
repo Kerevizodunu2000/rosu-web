@@ -43,7 +43,7 @@ export default async function ChangelogView({ locale }: { locale: Locale }) {
                   <time dateTime={r.published_at ?? undefined}>{formatDate(r.published_at, locale)}</time>
                 </div>
               </div>
-              <div lang="en"><Markdown source={r.body || t.noNotes} className="text-sm" /></div>
+              <div lang="en"><Markdown source={r.body || t.noNotes} className="text-sm" headingOffset={0} /></div>
               <div className="mt-6 flex flex-wrap gap-3">
                 {r.download_url && (
                   <a href={r.download_url} className="btn btn-primary" rel="noopener noreferrer">
