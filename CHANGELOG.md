@@ -32,6 +32,8 @@ Work toward **2.0 "Brand & Show"**.
 - The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song
   detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
   and the update check only asks for the latest version number.
+- The site sends HSTS (two years, subdomains, no preload) and `Cross-Origin-Opener-Policy:
+  same-origin`; API responses also send `Cross-Origin-Resource-Policy: same-origin` (CORP).
 
 ### Fixed
 - Links and buttons now have tap targets of at least 24×24 px (carousel dots, footer and
