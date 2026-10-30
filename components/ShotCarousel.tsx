@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import type { LightboxLabels } from "./Lightbox";
@@ -21,6 +21,14 @@ export type CarouselShot = {
 const VISIBLE = 3; // card slots (the grid collapses to 1 column on mobile)
 const INTERVAL_MS = 4000;
 
+function IconPlayPause({ playing }: { playing: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+      {playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5v14l11-7z" />}
+    </svg>
+  );
+}
+
 function IconZoom() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -34,13 +42,16 @@ function IconZoom() {
 /**
  * Auto-rotating window of {VISIBLE} screenshot cards over a larger pool.
  * Every few seconds the window advances by one with a slide-in animation
- * (staggered per card). Rotation pauses on hover/focus and while the lightbox
- * is open, and never starts for users who prefer reduced motion. Clicking a
+ * (staggered per card). Rotation pauses while the pointer is over the carousel,
+ * while focus is inside it, while the lightbox is open, and until the user
+ * presses play after pressing the pause button (WCAG 2.2.2). It never runs for
+ * users who prefer reduced motion, who also get no pause button. Clicking a
  * card opens the full-pool Lightbox gallery at that screenshot.
  */
-export type CarouselLabels = { enlarge: string; show: string; pages: string; lightbox: LightboxLabels };
+export type CarouselLabels = { enlarge: string; show: string; pages: string; pause: string; play: string; lightbox: LightboxLabels };
 const DEFAULT_LABELS: CarouselLabels = {
   enlarge: "Enlarge the {title} screenshot", show: "Show {title} first", pages: "Screenshot pages",
+  pause: "Pause the slideshow", play: "Play the slideshow",
   lightbox: { previous: "Previous image", next: "Next image", close: "Close" },
 };
 const fill = (template: string, title: string) => template.replace("{title}", title);
@@ -48,28 +59,35 @@ const fill = (template: string, title: string) => template.replace("{title}", ti
 export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots: CarouselShot[]; labels?: CarouselLabels }) {
   const count = shots.length;
   const [offset, setOffset] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const reducedMotion = useRef(false);
 
   useEffect(() => {
-    reducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReducedMotion(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
   }, []);
 
+  const rotating = count > VISIBLE && lightboxIndex === null && !userPaused && !hovered && !focused && !reducedMotion;
   useEffect(() => {
-    if (paused || lightboxIndex !== null || count <= VISIBLE || reducedMotion.current) return;
+    if (!rotating) return;
     const t = setInterval(() => setOffset((o) => (o + 1) % count), INTERVAL_MS);
     return () => clearInterval(t);
-  }, [paused, lightboxIndex, count]);
+  }, [rotating, count]);
 
   const galleryImages = shots.map((s) => ({ src: s.src, alt: s.alt, caption: s.title }));
 
   return (
     <div
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
     >
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: Math.min(VISIBLE, count) }, (_, slot) => {
@@ -119,24 +137,36 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
       </div>
 
       {count > VISIBLE && (
-        <div className="mt-6 flex items-center justify-center" role="group" aria-label={labels.pages}>
-          {shots.map((s, i) => (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <div className="flex items-center" role="group" aria-label={labels.pages}>
+            {shots.map((s, i) => (
+              <button
+                key={s.src}
+                type="button"
+                onClick={() => setOffset(i)}
+                aria-label={fill(labels.show, s.title)}
+                aria-current={i === offset}
+                className="group flex h-6 min-w-6 items-center justify-center"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    i === offset ? "w-6 bg-accent-2" : "w-2 bg-fg-muted/30 group-hover:bg-fg-muted/60"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+          {!reducedMotion && (
             <button
-              key={s.src}
               type="button"
-              onClick={() => setOffset(i)}
-              aria-label={fill(labels.show, s.title)}
-              aria-current={i === offset}
-              className="group flex h-6 min-w-6 items-center justify-center"
+              onClick={() => setUserPaused((p) => !p)}
+              aria-label={userPaused ? labels.play : labels.pause}
+              className="flex h-6 min-w-6 items-center justify-center rounded-full text-fg-muted transition-colors hover:text-fg"
             >
-              <span
-                aria-hidden="true"
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  i === offset ? "w-6 bg-accent-2" : "w-2 bg-fg-muted/30 group-hover:bg-fg-muted/60"
-                }`}
-              />
+              <IconPlayPause playing={!userPaused} />
             </button>
-          ))}
+          )}
         </div>
       )}
 
