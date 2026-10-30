@@ -117,6 +117,7 @@ export default function Wrapped({ t, locale }: { t: T; locale: Locale }) {
   async function load(file: File | undefined) {
     const ticket = ++latest.current;
     setError(null);
+    setBusy(false);
     setData(null);
     setYears([]);
     setYear(null);

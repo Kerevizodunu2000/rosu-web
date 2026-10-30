@@ -90,6 +90,7 @@ export default function ShareCard({ t, locale }: { t: T; locale: Locale }) {
   async function load(file: File | undefined) {
     const ticket = ++latest.current;
     setError(null);
+    setBusy(false);
     setStats(null);
     if (!file) return;
     if (file.size > MAX_BYTES) { setError(t.tooBig); return; }
