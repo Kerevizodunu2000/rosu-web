@@ -37,6 +37,10 @@ Work toward **2.0 "Brand & Show"**.
 - Links and buttons now have tap targets of at least 24×24 px (carousel dots, footer and
   header links, language switcher), and the docs, API and devlog pages no longer skip a
   heading level.
+- Rate limits (sign-in, reports, confirmation e-mails, crash reports) can no longer be
+  slipped past by sending many requests at once, crash reports now also remove Windows and
+  macOS user names that contain spaces, and a screenshot that is still uploading or hit by a
+  temporary Google Drive error is no longer lost from the nightly archive.
 
 ## [1.6.0] - 2026-10-20
 
