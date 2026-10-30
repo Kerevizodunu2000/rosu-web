@@ -28,7 +28,7 @@ verdict.
 
 ## Decide
 
-rosu-web is the website and small backend for Rosu (rosu-web.vercel.app): Next.js 16 on the Vercel free tier with Neon Postgres, in English, Turkish and Japanese. It hosts docs, the changelog, the bug-report form and admin, web tools (missing packs, share card, Wrapped), and planned list sharing with osu! login. It takes no money and spends none: only free tiers. The roadmap and the owner's rules in `CLAUDE.md` decide what belongs.
+rosu-web is the website and small backend for Rosu (rosu-web.vercel.app): Next.js 16 on the Vercel free tier with Neon Postgres, in English, Turkish and Japanese. It hosts docs, the changelog, the bug-report form and admin, web tools (missing packs, share card, Wrapped). It takes no money and spends none: only free tiers. The owner's rules in `CLAUDE.md` decide what belongs.
 
 - **ACCEPT** when it belongs in the project and can be built without asking
   anyone. If it's too big for one reviewable pull request, or vague, rescope
