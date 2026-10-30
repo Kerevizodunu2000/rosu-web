@@ -81,6 +81,12 @@ body {
   }
 }
 
+/* Japanese: break lines at phrase boundaries, looser leading, no synthetic oblique (CJK has no italics).
+   Unlayered on purpose: Tailwind utilities (text-sm, leading-*) would beat the same rule inside @layer base. */
+[lang|="ja"] { word-break: auto-phrase; }
+[lang|="ja"] :is(p, li, dd, blockquote) { line-height: 1.8; }
+[lang|="ja"] :is(em, i, .italic) { font-style: normal; }
+
 /* Consistent, visible focus indication for every interactive element on every page. */
 :focus-visible {
   outline: 2px solid var(--accent-2);
