@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import ReportView from "@/components/views/ReportView";
 import { pageMeta } from "@/lib/pageMeta";
 import { routeLocale } from "@/lib/intlParams";
@@ -14,6 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
+  await connection(); // per-request render, so the CSP nonce reaches Next's scripts
   const locale = await routeLocale(params);
   return <ReportView locale={locale} />;
 }
