@@ -3,7 +3,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Lightbox, { type LightboxLabels } from "./Lightbox";
+import dynamic from "next/dynamic";
+import type { LightboxLabels } from "./Lightbox";
+
+// Loaded on first open, so the viewer is not in the first-load bundle.
+const Lightbox = dynamic(() => import("./Lightbox"), { ssr: false });
 
 export type CarouselShot = {
   src: string;
