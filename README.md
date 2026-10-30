@@ -142,7 +142,7 @@ flowchart LR
   end
 
   neon[("Neon Postgres<br/>report rows, rate limits,<br/>sessions: a small index, not bulk storage")]
-  drive[("Google Drive<br/>owner's, private, 15 GB:<br/>screenshots + ZIP archives")]
+  drive[("Google Drive<br/>private:<br/>screenshots + ZIP archives")]
   gh["GitHub Releases"]
   hc["healthchecks.io<br/>(optional watchdog)"]
 
@@ -160,7 +160,7 @@ flowchart LR
 ```
 
 - **Report text** goes to **Neon** (serverless Postgres). It is used for rate limiting, atomic ids, the admin listing and staged/archived status, *not* as bulk storage.
-- **Screenshots** go to the owner's **Google Drive** (private, 15 GB), reusing the desktop app's existing OAuth client (scope `drive.file`).
+- **Screenshots** go to a private **Google Drive**, reusing the desktop app's existing OAuth client (scope `drive.file`).
 - A **daily Vercel Cron** (plus a manual "Archive now" button) bundles pending reports and images into a ZIP in Drive and empties the staging area, so no small-quota store ever fills. The same nightly job **enforces the 12-month retention** (old archive ZIPs, archived report rows, crash data and the admin log are deleted) and pings an optional **healthchecks.io** watchdog. Reports are also archived right away once `AUTO_ARCHIVE_THRESHOLD` are pending.
 - Every report gets a private **tracking link** (`/report/status/<token>`; only the token's hash is stored) showing received → in review → fixed in vX. Reporters can opt in to a one-off confirmation e-mail with that link (Resend).
 - The app migrates its own database schema on first use (idempotent DDL in `db/schema.mjs`), so a deploy can never run against missing columns.

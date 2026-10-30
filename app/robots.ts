@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Private or per-person pages: never worth crawling.
-      disallow: ["/admin", "/api/", "/report/status/"],
+      disallow: ["/api/", "/report/status/"],
     }],
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

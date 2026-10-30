@@ -315,7 +315,7 @@ export const ja: Dict = {
   },
   devlog: {
     title: '開発ログ',
-    description: 'Rosu 開発のメモ：機能の作り方、うまくいかなかったこと、次にやること。',
+    description: 'Rosu 開発のメモ：機能の作り方と、うまくいかなかったこと。',
     intro: 'Rosu 開発のメモ — どう作り、なぜそうしたのか。',
     back: '← 開発ログ',
     postsInEnglish: '記事は英語で書かれています。',

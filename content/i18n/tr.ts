@@ -315,7 +315,7 @@ export const tr: Dict = {
   },
   devlog: {
     title: 'Geliştirici günlüğü',
-    description: "Rosu'yu geliştirirken alınan notlar: özellikler nasıl yapılıyor, neler ters gitti ve sırada ne var.",
+    description: "Rosu'yu geliştirirken alınan notlar: özellikler nasıl yapılıyor ve neler ters gitti.",
     intro: "Rosu'yu geliştirirken alınan notlar — işler nasıl ve neden böyle yapılıyor.",
     back: '← Geliştirici günlüğü',
     postsInEnglish: 'Yazılar İngilizcedir.',

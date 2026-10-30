@@ -10,8 +10,6 @@ site is deployed and verified end-to-end; fixes and features land as `1.0.1`,
 
 ## [Unreleased]
 
-Work toward **2.0 "Brand & Show"**.
-
 ### Added
 - **Türkçe and 日本語.** Every public page is also at `/tr/…` and `/ja/…` (English stays at
   the bare paths), built ahead of time. A language switcher in the header keeps you on the

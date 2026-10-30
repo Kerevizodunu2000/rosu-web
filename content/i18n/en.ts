@@ -317,7 +317,7 @@ export const en = {
   },
   devlog: {
     title: 'Devlog',
-    description: 'Notes from building Rosu: how features are made, what went wrong, and what is next.',
+    description: 'Notes from building Rosu: how features are made and what went wrong.',
     intro: 'Notes from building Rosu — how things are made and why.',
     back: '← Devlog',
     postsInEnglish: 'Posts are written in English.',

@@ -3,7 +3,7 @@ import { test, expect } from 'vitest'
 import { scrubText, cleanFrame, parseCrash, crashFingerprint, handleCrash, type CrashDeps } from '@/lib/crash'
 
 test('scrubText removes paths and e-mail addresses', () => {
-  expect(scrubText('No such file: C:\\Users\\halil\\osu!\\Songs\\x.osz')).toBe('No such file: <path>')
+  expect(scrubText('No such file: C:\\Users\\you\\osu!\\Songs\\x.osz')).toBe('No such file: <path>')
   expect(scrubText("open '/home/bob/.config/rosu/x'")).toBe("open '<path>'")
   expect(scrubText('mail bob@example.com now')).toBe('mail <email> now')
   expect(scrubText('\\\\nas\\share\\maps failed')).toBe('<path> failed')

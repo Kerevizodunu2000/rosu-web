@@ -80,7 +80,7 @@ test('secret admin path: /admin is a 404, the slug serves the sign-in', async ({
 
 test('robots, sitemap and the social card are served', async ({ request }) => {
   const robots = await (await request.get('/robots.txt')).text()
-  expect(robots).toContain('Disallow: /admin')
+  expect(robots).not.toContain('/admin')
   expect(await (await request.get('/sitemap.xml')).text()).toContain('/devlog/zero-budget-bug-report-pipeline')
   const og = await request.get('/opengraph-image')
   expect(og.status()).toBe(200)
