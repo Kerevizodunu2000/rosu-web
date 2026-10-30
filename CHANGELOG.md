@@ -33,6 +33,11 @@ Work toward **2.0 "Brand & Show"**.
   detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
   and the update check only asks for the latest version number.
 
+### Fixed
+- Links and buttons now have tap targets of at least 24×24 px (carousel dots, footer and
+  header links, language switcher), and the docs, API and devlog pages no longer skip a
+  heading level.
+
 ## [1.6.0] - 2026-10-20
 
 **Tools: free helpers that run in your browser.**

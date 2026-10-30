@@ -40,7 +40,7 @@ export function DevlogPostView({ locale, slug }: { locale: Locale; slug: string 
       <div lang="en">
         <time dateTime={post.date} className="mt-6 block font-mono text-xs uppercase tracking-wide text-fg-muted">{post.date}</time>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{post.title}</h1>
-        <Markdown source={post.body} locale={locale} className="mt-4" />
+        <Markdown source={post.body} locale={locale} className="mt-4" headingOffset={0} />
       </div>
     </article>
   );

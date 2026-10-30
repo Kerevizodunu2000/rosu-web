@@ -119,7 +119,7 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
       </div>
 
       {count > VISIBLE && (
-        <div className="mt-6 flex items-center justify-center gap-2" role="group" aria-label={labels.pages}>
+        <div className="mt-6 flex items-center justify-center" role="group" aria-label={labels.pages}>
           {shots.map((s, i) => (
             <button
               key={s.src}
@@ -127,10 +127,15 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
               onClick={() => setOffset(i)}
               aria-label={fill(labels.show, s.title)}
               aria-current={i === offset}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                i === offset ? "w-6 bg-accent-2" : "w-2 bg-fg-muted/30 hover:bg-fg-muted/60"
-              }`}
-            />
+              className="group flex h-6 min-w-6 items-center justify-center"
+            >
+              <span
+                aria-hidden="true"
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  i === offset ? "w-6 bg-accent-2" : "w-2 bg-fg-muted/30 group-hover:bg-fg-muted/60"
+                }`}
+              />
+            </button>
           ))}
         </div>
       )}

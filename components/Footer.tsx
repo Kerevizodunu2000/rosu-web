@@ -60,7 +60,7 @@ function SocialLink({ href, label, children }: { href: string; label: string; ch
   );
 }
 
-const FOOT_LINK = "transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4";
+const FOOT_LINK = "inline-flex min-h-6 items-center transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4";
 
 export default function Footer({ locale }: { locale: Locale }) {
   const t = dict(locale);
@@ -76,13 +76,13 @@ export default function Footer({ locale }: { locale: Locale }) {
           </div>
 
           <div className="flex flex-col items-start gap-4 sm:items-end">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-fg-muted">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-fg-muted">
               <Link href={localePath(locale, PRIVACY_PATH)} className={FOOT_LINK}>{f.privacy}</Link>
               <Link href={localePath(locale, TERMS_PATH)} className={FOOT_LINK}>{f.terms}</Link>
               <Link href={localePath(locale, "/devlog")} className={FOOT_LINK}>{f.devlog}</Link>
               <Link href={localePath(locale, "/status")} className={FOOT_LINK}>{f.status}</Link>
               <CopyEmail className={FOOT_LINK} copiedText={f.emailCopied} />
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 ${FOOT_LINK}`}>
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={`gap-1.5 ${FOOT_LINK}`}>
                 <GithubIcon />
                 GitHub
               </a>

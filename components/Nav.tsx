@@ -6,7 +6,7 @@ import { DOWNLOAD_URL } from "@/lib/links";
 import { localePath, type Locale } from "@/lib/i18n";
 import { dict } from "@/content/i18n";
 
-const LINK_CLASS = "transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4";
+const LINK_CLASS = "inline-flex min-h-6 items-center transition-colors hover:text-fg hover:underline decoration-accent-2 underline-offset-4";
 
 /** The one list of primary links, rendered inline on wide screens and as a second row on phones. */
 function NavLinks({ locale, className }: { locale: Locale; className: string }) {
@@ -44,7 +44,7 @@ export default function Nav({ locale }: { locale: Locale }) {
             </a>
           </div>
         </div>
-        <NavLinks locale={locale} className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 border-t border-border py-2.5 text-sm font-medium text-fg-muted lg:hidden" />
+        <NavLinks locale={locale} className="flex flex-wrap items-center justify-center gap-x-5 gap-y-0 border-t border-border py-2.5 text-sm font-medium text-fg-muted lg:hidden" />
       </nav>
     </header>
   );

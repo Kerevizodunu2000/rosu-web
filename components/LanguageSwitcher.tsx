@@ -17,7 +17,7 @@ export default function LanguageSwitcher({ locale, label }: { locale: Locale; la
           hrefLang={l}
           lang={l}
           aria-current={l === locale ? "true" : undefined}
-          className={`rounded-full px-2 py-1 transition-colors ${
+          className={`inline-flex min-h-6 items-center rounded-full px-2 py-1 transition-colors ${
             l === locale ? "bg-accent/15 text-fg" : "text-fg-muted hover:text-fg"
           }`}
         >
