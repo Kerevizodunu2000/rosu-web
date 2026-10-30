@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// latin only: a latin-ext preload competes with the hero image and delays LCP.
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
 });
 
 // Stays preloaded: the hero tagline is mono, and a late swap re-wraps it on /tr (layout shift).
