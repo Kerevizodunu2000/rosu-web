@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-export type RateDeps = {
+export type RateReason = 'rate_minute' | 'rate_day' | 'rate_global'
+/** Count-and-record in one atomic step (lib/db.ts tryRecordRateEvent): null when recorded. */
+export type AtomicRateDeps = {
+  tryRecordRateEvent: (ipHash: string, limits: RateLimits, nowMs: number) => Promise<null | RateReason>
+}
+// Not atomic (parallel requests all read the old count): kept for old tests only, no route may use it.
+export type LegacyRateDeps = {
   countEventsSince: (ipHash: string, sinceIso: string) => Promise<number>
   countAllEventsSince: (sinceIso: string) => Promise<number>
   recordRateEvent: (ipHash: string) => Promise<void>
 }
+export type RateDeps = AtomicRateDeps | LegacyRateDeps
 export type RateLimits = { perIpMinute: number; perIpDay: number; globalDay: number }
 
 /** Public report endpoint (desktop + web form). */
@@ -26,6 +33,10 @@ export const CRASH_LIMITS: RateLimits = { perIpMinute: 10, perIpDay: 50, globalD
 
 export async function checkRateLimit(ipHash: string, deps: RateDeps, now = Date.now(), limits: RateLimits = REPORT_LIMITS):
   Promise<{ allowed: boolean; reason?: string }> {
+  if ('tryRecordRateEvent' in deps) {
+    const reason = await deps.tryRecordRateEvent(ipHash, limits, now)
+    return reason === null ? { allowed: true } : { allowed: false, reason }
+  }
   const minAgo = new Date(now - 60_000).toISOString()
   const dayAgo = new Date(now - 86_400_000).toISOString()
   if (await deps.countEventsSince(ipHash, minAgo) >= limits.perIpMinute) return { allowed: false, reason: 'rate_minute' }

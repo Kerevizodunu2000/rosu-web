@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { neon } from '@neondatabase/serverless'
 import { ensureSchema } from './schema'
+import type { RateLimits, RateReason } from './ratelimit'
 
 export type ReportStatus = 'received' | 'in_review' | 'fixed' | 'closed'
 export const REPORT_STATUSES: readonly ReportStatus[] = ['received', 'in_review', 'fixed', 'closed']
@@ -238,13 +239,35 @@ export type RateKind = 'report' | 'login' | 'login_fail' | 'crash' | 'ack' | 'ac
 export async function recordRateEvent(sql: Sql, ip_hash: string, kind: RateKind = 'report'): Promise<void> {
   await sql`INSERT INTO rate_events (ip_hash, kind) VALUES (${ip_hash}, ${kind})`
 }
-export async function countEventsSince(sql: Sql, ip_hash: string, sinceIso: string, kind: RateKind = 'report'): Promise<number> {
-  const rows = await sql`SELECT count(*)::int AS n FROM rate_events WHERE kind = ${kind} AND ip_hash = ${ip_hash} AND created_at > ${sinceIso}` as { n: number }[]
-  return rows[0].n
-}
-export async function countAllEventsSince(sql: Sql, sinceIso: string, kind: RateKind = 'report'): Promise<number> {
-  const rows = await sql`SELECT count(*)::int AS n FROM rate_events WHERE kind = ${kind} AND created_at > ${sinceIso}` as { n: number }[]
-  return rows[0].n
+/**
+ * Count and record a rate event in one transaction, serialized by an advisory
+ * lock: per kind when there is a global cap (so the global count is exact too),
+ * else per kind and IP. Returns the limit that blocked it, or null once recorded.
+ */
+export async function tryRecordRateEvent(sql: Sql, ip_hash: string, kind: RateKind, limits: RateLimits, nowMs: number):
+  Promise<null | RateReason> {
+  const global = Number.isFinite(limits.globalDay) ? limits.globalDay : null
+  const lockKey = global === null ? `${kind}:${ip_hash}` : kind
+  const minAgo = new Date(nowMs - 60_000).toISOString()
+  const dayAgo = new Date(nowMs - 86_400_000).toISOString()
+  const [, rows] = await sql.transaction((txn) => [
+    txn`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
+    txn`WITH c AS (
+        SELECT count(*) FILTER (WHERE ip_hash = ${ip_hash} AND created_at > ${minAgo}) AS m,
+               count(*) FILTER (WHERE ip_hash = ${ip_hash}) AS d,
+               count(*) AS g
+          FROM rate_events
+         WHERE kind = ${kind} AND created_at > ${dayAgo} AND (${global}::int IS NOT NULL OR ip_hash = ${ip_hash})
+      ), r AS (
+        SELECT CASE WHEN m >= ${limits.perIpMinute} THEN 'rate_minute'
+                    WHEN d >= ${limits.perIpDay} THEN 'rate_day'
+                    WHEN ${global}::int IS NOT NULL AND g >= ${global}::int THEN 'rate_global' END AS reason FROM c
+      ), ins AS (
+        INSERT INTO rate_events (ip_hash, kind) SELECT ${ip_hash}, ${kind} FROM r WHERE reason IS NULL RETURNING 1
+      )
+      SELECT reason FROM r`,
+  ]) as [unknown, { reason: RateReason | null }[]]
+  return rows[0]?.reason ?? null
 }
 export async function pruneRateEvents(sql: Sql, beforeIso: string): Promise<void> {
   await sql`DELETE FROM rate_events WHERE created_at < ${beforeIso}`
