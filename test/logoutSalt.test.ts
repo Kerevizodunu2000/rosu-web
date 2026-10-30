@@ -17,14 +17,12 @@ const req = () => new NextRequest('http://x.test/api/admin/logout', {
 beforeEach(() => { vi.clearAllMocks() })
 afterEach(() => { vi.unstubAllEnvs() })
 
-test('a missing salt answers 503 before anything is revoked', async () => {
+test('a missing salt still signs out, auditing without an IP hash', async () => {
   vi.stubEnv('IP_HASH_SALT', '')
   const res = await POST(req())
-  expect(res.status).toBe(503)
-  expect(await res.json()).toEqual({ ok: false, error: 'unavailable' })
-  expect(m.revokeAdminSessionFamily).not.toHaveBeenCalled()
-  expect(m.revokeAllAdminSessions).not.toHaveBeenCalled()
-  expect(m.insertAudit).not.toHaveBeenCalled()
+  expect(res.status).toBe(200)
+  expect(m.revokeAdminSessionFamily).toHaveBeenCalledOnce()
+  expect(m.insertAudit).toHaveBeenCalledWith({}, 'logout', null)
 })
 
 test('with the salt set the audit hash uses it', async () => {
