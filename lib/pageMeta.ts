@@ -16,8 +16,9 @@ export function pageMeta(locale: Locale, path: string, title: string | null, des
     openGraph: {
       type: 'website', siteName: 'Rosu', title: full, description,
       url: alternates(locale, path).canonical, locale: LOCALE_TAGS[locale].replace('-', '_'),
+      images: ['/opengraph-image'],
     },
-    twitter: { card: 'summary_large_image', title: full, description },
+    twitter: { card: 'summary_large_image', title: full, description, images: ['/twitter-image'] },
     ...extra,
   }
 }
