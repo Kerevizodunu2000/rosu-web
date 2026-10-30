@@ -40,6 +40,11 @@ Work toward **2.0 "Brand & Show"**.
   header links, language switcher), and the docs, API and devlog pages no longer skip a
   heading level.
 
+### Security
+- The report and admin pages send a strict per-request nonce Content Security Policy
+  (`script-src` with `'strict-dynamic'`, no plugins, no `<base>`, same-origin forms) and a
+  report-only Trusted Types policy.
+
 ## [1.6.0] - 2026-10-20
 
 **Tools: free helpers that run in your browser.**
