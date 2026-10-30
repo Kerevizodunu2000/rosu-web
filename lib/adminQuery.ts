@@ -57,3 +57,10 @@ export function pageCount(total: number): number {
 export function clampPage(page: number, total: number): number {
   return Math.min(Math.max(1, page), pageCount(total))
 }
+
+/** A timestamp as "2 Jan 2026, 23:30 UTC", the same in every admin view and
+ *  for every viewer; an unparseable input comes back unchanged. */
+export function formatAdminDate(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC'
+}

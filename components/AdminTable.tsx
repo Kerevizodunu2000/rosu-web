@@ -6,15 +6,9 @@ import { useRouter } from "next/navigation";
 import type { ReportRecord, ReportStatus } from "@/lib/db";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS, NOTE_MAX, BULK_MAX } from "@/lib/reportStatus";
-import { adminHref, pageCount, PAGE_SIZE, Q_MAX, type AdminQuery } from "@/lib/adminQuery";
+import { adminHref, formatAdminDate, pageCount, PAGE_SIZE, Q_MAX, type AdminQuery } from "@/lib/adminQuery";
 
 type ArchiveResponse = { ok?: boolean; archived?: number; archiveName?: string };
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
 
 // The one signature touch: a small source dot (reused inside the existing
 // `.chip` primitive) that's echoed as a thin left rail on the row itself, so
@@ -532,7 +526,7 @@ export default function AdminTable({
                         dateTime={r.created_at}
                         className="block whitespace-nowrap font-mono text-xs tabular-nums text-fg-muted"
                       >
-                        {formatDate(r.created_at)}
+                        {formatAdminDate(r.created_at)}
                       </time>
                       <span className="mt-1 block font-mono text-[10px] text-fg-muted">#{r.id}</span>
                     </td>
