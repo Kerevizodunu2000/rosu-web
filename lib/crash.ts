@@ -16,6 +16,9 @@ const s = (v: unknown) => (typeof v === 'string' ? v : '')
 /** Replace path-like and e-mail-like substrings: a message must not carry a username. */
 export function scrubText(v: string): string {
   return v
+    // A home folder's user name may contain spaces: take it up to the next separator, quote or line end.
+    .replace(/[A-Za-z]:[\\/]users[\\/][^\\/'"\r\n]*(?:[\\/][^\s'"<>|]*)?/gi, '<path>')
+    .replace(/\/(?:home|Users)[\\/][^\\/'"\r\n]*(?:[\\/][^\s'"<>|]*)?/g, '<path>')
     .replace(/[A-Za-z]:[\\/][^\s'"<>|]*/g, '<path>')              // C:\Users\name\...
     .replace(/\\\\[^\s'"<>|]+/g, '<path>')                          // \\server\share\...
     .replace(/(?:~|\/(?:home|Users|root|mnt|media|var|tmp|private))[\\/][^\s'"<>|]*/g, '<path>')
