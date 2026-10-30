@@ -9,7 +9,10 @@ import { ja } from '@/content/i18n/ja'
 // Placeholder and link checks stay in i18n.test.ts.
 function parity(a: unknown, b: unknown, path: string, out: string[]) {
   const empty = (v: unknown, side: 'a' | 'b') => { if (v === '') out.push(`${path}: empty (${side})`) }
-  if (typeof a === 'string' || typeof b === 'string') { empty(a, 'a'); empty(b, 'b'); return }
+  if (typeof a === 'string' || typeof b === 'string') {
+    if (typeof a !== typeof b) out.push(`${path}: shape differs`)
+    empty(a, 'a'); empty(b, 'b'); return
+  }
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b)) { out.push(`${path}: list vs non-list`); return }
     if (path.endsWith('Summary')) return   // legal summaries exist only where needed (Japanese)
@@ -23,8 +26,8 @@ function parity(a: unknown, b: unknown, path: string, out: string[]) {
   if (a && b && typeof a === 'object' && typeof b === 'object') {
     const x = a as Record<string, unknown>, y = b as Record<string, unknown>
     for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-      if (!(k in x)) out.push(`${path}.${k}: missing from first`)
-      else if (!(k in y)) out.push(`${path}.${k}: missing from second`)
+      if (!Object.hasOwn(x, k)) out.push(`${path}.${k}: missing from first`)
+      else if (!Object.hasOwn(y, k)) out.push(`${path}.${k}: missing from second`)
       else parity(x[k], y[k], `${path}.${k}`, out)
     }
     return
@@ -60,6 +63,9 @@ test('the walker reports missing, extra and empty values', () => {
   expect(out).toContain('.b.c: missing from second')
   expect(out).toContain('.d: missing from first')
   expect(out).toContain('.l[0].k: missing from second')
+  const shape: string[] = []
+  parity({ a: { b: 'x' }, l: ['x'] }, { a: 'y', l: 'z' }, '', shape)
+  expect(shape).toEqual(['.a: shape differs', '.l: shape differs'])
   const e: string[] = []
   parity({ a: 'x' }, { a: '' }, '', e)
   expect(e).toEqual(['.a: empty (b)'])
