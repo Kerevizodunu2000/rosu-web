@@ -74,6 +74,13 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+@layer base {
+  /* Geist has no CJK glyphs; name system fonts so none is ever fetched for Japanese. */
+  [lang|="ja"] {
+    font-family: var(--font-geist-sans), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
+  }
+}
+
 /* Consistent, visible focus indication for every interactive element on every page. */
 :focus-visible {
   outline: 2px solid var(--accent-2);

@@ -163,8 +163,9 @@ export default function HomeView({ locale }: { locale: Locale }) {
                   width={1278}
                   height={918}
                   alt={h.dashboardAlt}
-                  priority
-                  sizes="(min-width: 1024px) 480px, (min-width: 640px) 60vw, 100vw"
+                  preload
+                  fetchPriority="high"
+                  sizes="(min-width: 1152px) 475px, (min-width: 1024px) calc((100vw - 120px) * 0.46), (min-width: 488px) 448px, calc(100vw - 40px)"
                   className="h-auto w-full transition-transform duration-200 group-hover:scale-[1.02]"
                 />
               </ZoomableShot>

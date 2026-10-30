@@ -100,7 +100,7 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
                   height={shot.height}
                   alt={shot.alt}
                   loading="lazy"
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  sizes="(min-width: 1152px) 347px, (min-width: 1024px) calc((100vw - 112px) / 3), (min-width: 640px) calc((100vw - 88px) / 2), calc(100vw - 40px)"
                   className="h-auto max-w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
                 />
                 <span
