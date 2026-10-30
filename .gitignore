@@ -54,3 +54,7 @@ AGENTS.md
 # Software factory runtime state (see factory/ and .claude/skills/factory)
 /factory/jobs/
 /factory/.github-cache/
+
+# Planning notes stay local
+HANDOFF.md
+docs/superpowers/

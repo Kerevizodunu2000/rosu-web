@@ -282,7 +282,7 @@ test/             Vitest unit tests (offline, dependencies injected)
 e2e/              Playwright smoke, i18n and axe accessibility tests
 public/           brand mark, icon and the app screenshots
 factory/          the software-factory scripts and checks (factory/checks.sh)
-docs/             design spec, implementation plan and README art
+docs/             README art
 reference/        the earlier (rejected) Google Apps Script approach, kept for context
 ```
 
