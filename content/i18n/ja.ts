@@ -274,6 +274,9 @@ export const ja: Dict = {
     notFoundText:
       'この追跡リンクは無効か、指していた報告は削除されています。報告は 12 か月間保管され、依頼があれば削除されます。',
     sendNew: '新しい報告を送る',
+    unavailable: '現在、状況を表示できません',
+    unavailableText:
+      'ただいまこの報告を確認できませんでした。数分後にもう一度お試しください。リンクは引き続き有効です。',
     reportN: '報告 #{id}',
     sentOn: '{date} に送信',
     updatedOn: ' · 最終更新 {date}',

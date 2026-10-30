@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Link from "next/link";
 import Rich from "@/components/Rich";
-import { getDb, findReportByStatusHash, type ReportRecord, type ReportStatus } from "@/lib/db";
-import { hashStatusToken, isStatusToken } from "@/lib/reportStatus";
+import { getDb, findReportByStatusHash, type ReportStatus } from "@/lib/db";
+import { lookupReportStatus } from "@/lib/reportStatus";
 import { GITHUB_URL } from "@/lib/links";
 import { LOCALE_TAGS, localePath, type Locale } from "@/lib/i18n";
 import { dict, fmt } from "@/content/i18n";
@@ -13,15 +13,6 @@ function formatDate(iso: string | null, locale: Locale): string {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(LOCALE_TAGS[locale], { dateStyle: "long", timeZone: "UTC" });
-}
-
-async function lookup(token: string): Promise<ReportRecord | null> {
-  if (!isStatusToken(token)) return null;
-  try {
-    return await findReportByStatusHash(await getDb(), hashStatusToken(token));
-  } catch {
-    return null;
-  }
 }
 
 function Timeline({ status, labels, progress, current }: {
@@ -63,9 +54,18 @@ function Timeline({ status, labels, progress, current }: {
 
 export default async function ReportStatusView({ locale, token }: { locale: Locale; token: string }) {
   const t = dict(locale).reportStatus;
-  const report = await lookup(token);
+  const result = await lookupReportStatus(token, { find: async (hash) => findReportByStatusHash(await getDb(), hash) });
 
-  if (!report) {
+  if (result.state === "error") {
+    return (
+      <section className="mx-auto max-w-2xl px-5 py-16 sm:px-8 sm:py-20">
+        <h1 className="text-3xl font-semibold tracking-tight text-fg">{t.unavailable}</h1>
+        <p className="mt-3 leading-relaxed text-fg-muted">{t.unavailableText}</p>
+      </section>
+    );
+  }
+
+  if (result.state === "missing") {
     return (
       <section className="mx-auto max-w-2xl px-5 py-16 sm:px-8 sm:py-20">
         <h1 className="text-3xl font-semibold tracking-tight text-fg">{t.notFound}</h1>
@@ -75,6 +75,7 @@ export default async function ReportStatusView({ locale, token }: { locale: Loca
     );
   }
 
+  const { report } = result;
   const releaseUrl = report.fixed_in ? `${GITHUB_URL}/releases/tag/${encodeURIComponent(report.fixed_in)}` : null;
 
   return (

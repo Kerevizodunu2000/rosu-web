@@ -46,6 +46,22 @@ Work toward **2.0 "Brand & Show"**.
   slipped past by sending many requests at once, crash reports now also remove Windows and
   macOS user names that contain spaces, and a screenshot that is still uploading or hit by a
   temporary Google Drive error is no longer lost from the nightly archive.
+- Every page now has a social preview image (`og:image` and `twitter:image`), not only the
+  home page's file convention.
+- After a failed report submission the Turnstile check resets, so you can send again without
+  reloading the page.
+- The report status page says "Status unavailable right now" when the lookup fails, instead
+  of claiming the report was not found.
+- The admin report table shows dates in UTC, the same way as the other admin panels.
+- The slideshow on the home page has a pause button, and moving the pointer away or leaving
+  focus no longer restarts it while the other is still active. Turning on reduced motion
+  stops it straight away.
+- Choosing a file and then clearing it no longer leaves "Reading the export…" on the share
+  card and Wrapped tools.
+- The reporter's contact in the admin table only becomes a `mailto:` link when it is an
+  e-mail address, and is percent-encoded.
+- Headings with the same text on one page (the changelog's "Added" and "Fixed") now get
+  unique ids, and none can be `main`.
 
 ### Security
 - The report and admin pages send a strict per-request nonce Content Security Policy

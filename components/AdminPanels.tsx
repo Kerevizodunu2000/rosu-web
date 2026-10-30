@@ -4,11 +4,7 @@
 import type { AuditRow, CrashGroup, ReportStatsRaw } from "@/lib/db";
 import { fillSeries, niceMax, type Bucket } from "@/lib/stats";
 import { STATUS_LABELS } from "@/lib/reportStatus";
-
-function when(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
-}
+import { formatAdminDate } from "@/lib/adminQuery";
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -81,8 +77,8 @@ export function CrashPanel({ crashes }: { crashes: CrashGroup[] }) {
                   <td className="px-3 py-3 font-mono text-xs tabular-nums text-fg-muted">{c.hits}</td>
                   <td className="px-3 py-3 font-mono text-xs text-fg-muted">{c.last_version || "—"}</td>
                   <td className="py-3 pl-3 pr-4 text-xs text-fg-muted">
-                    <div>first {when(c.first_seen)}</div>
-                    <div>last {when(c.last_seen)}</div>
+                    <div>first {formatAdminDate(c.first_seen)}</div>
+                    <div>last {formatAdminDate(c.last_seen)}</div>
                   </td>
                 </tr>
               ))}
@@ -115,7 +111,7 @@ export function AuditPanel({ events }: { events: AuditRow[] }) {
         <ol className="card divide-y divide-border/70 text-sm">
           {events.map((e) => (
             <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
-              <time dateTime={e.at} className="font-mono text-xs tabular-nums text-fg-muted">{when(e.at)}</time>
+              <time dateTime={e.at} className="font-mono text-xs tabular-nums text-fg-muted">{formatAdminDate(e.at)}</time>
               <span className={e.event === "login_fail" || e.event === "dsar_failed" ? "font-medium text-accent-rose" : "font-medium text-fg"}>
                 {EVENT_LABELS[e.event] ?? e.event}
               </span>

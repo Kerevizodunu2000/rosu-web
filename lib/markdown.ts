@@ -89,6 +89,14 @@ export function parseMarkdown(src: string): Block[] {
   const lines = src.replace(/\r\n?/g, '\n').split('\n')
   const blocks: Block[] = []
   let para: string[] = []
+  const taken = new Set(['main']) // the skip link targets #main
+  const uniqueId = (slug: string) => {
+    if (!slug) return slug
+    let id = slug
+    for (let n = 2; taken.has(id); n++) id = `${slug}-${n}`
+    taken.add(id)
+    return id
+  }
   const endPara = () => {
     if (para.length) { blocks.push({ t: 'p', c: parseInline(para.join(' ')) }); para = [] }
   }
@@ -107,7 +115,7 @@ export function parseMarkdown(src: string): Block[] {
     if (h) {
       endPara()
       const c = parseInline(h[2])
-      blocks.push({ t: 'h', level: h[1].length as 1 | 2 | 3 | 4, c, id: slugify(plain(c)) })
+      blocks.push({ t: 'h', level: h[1].length as 1 | 2 | 3 | 4, c, id: uniqueId(slugify(plain(c))) })
       continue
     }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { endPara(); blocks.push({ t: 'hr' }); continue }

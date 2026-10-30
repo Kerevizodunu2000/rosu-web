@@ -274,6 +274,9 @@ export const tr: Dict = {
     notFoundText:
       'Bu takip bağlantısı geçersiz ya da işaret ettiği bildirim silinmiş. Bildirimler on iki ay saklanır ve istek üzerine silinir.',
     sendNew: 'Yeni bir bildirim gönder',
+    unavailable: 'Durum şu anda gösterilemiyor',
+    unavailableText:
+      'Bu bildirimi şu anda sorgulayamadık. Lütfen birkaç dakika sonra tekrar deneyin; bağlantınız hâlâ geçerli.',
     reportN: 'Bildirim #{id}',
     sentOn: '{date} tarihinde gönderildi',
     updatedOn: ' · son güncelleme {date}',
