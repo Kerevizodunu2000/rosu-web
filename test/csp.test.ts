@@ -40,3 +40,15 @@ test('routes: the report form and status pages in every locale, nothing else', (
   for (const p of ['/reporting', '/report-x', '/docs/report', '/en/report', '/xx/report', '/api/report', '/', '/status', '/report/status', '/report/status/a/b'])
     expect(cspRoute(p), p).toBe(false)
 })
+
+test('routes: percent-encoded paths match on their decoded segments', () => {
+  for (const p of ['/%74r/report', '/%6a%61/report', '/%74r/report/status/abc', '/%72eport', '/report/%73tatus/abc', '/report/status/x%2Fy'])
+    expect(cspRoute(p), p).toBe(true)
+  // a malformed escape is kept as-is instead of throwing
+  expect(cspRoute('/report/status/%')).toBe(true)
+  expect(cspRoute('/%E0%A4%A/report')).toBe(false)
+  expect(cspRoute('/%/report')).toBe(false)
+  // an encoded `/` is not a separator, and /en stays unprefixed
+  for (const p of ['/tr%2Freport', '/%2Freport', '/report%2Fstatus%2Fabc', '/%65n/report'])
+    expect(cspRoute(p), p).toBe(false)
+})
