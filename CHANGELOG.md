@@ -27,6 +27,7 @@ Work toward **2.0 "Brand & Show"**.
 - A 404 page in all three languages.
 
 ### Changed
+- Japanese text breaks lines at phrase boundaries, has taller line spacing and no longer uses fake italics.
 - **Faster landing page on mobile.** The hero screenshot loads first, screenshots are served as
   AVIF at the size they are shown, and Japanese text uses the system font.
 - The home page loads the screenshot viewer only when you open it, and the site targets current
