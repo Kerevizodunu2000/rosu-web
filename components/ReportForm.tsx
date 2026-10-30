@@ -206,6 +206,14 @@ export default function ReportForm({ ackEmailAvailable = false, t, locale }: {
       payload.image_name = screenshot.name;
     }
 
+    // The server spends the single-use token on every attempt, so any failure needs a fresh one.
+    const resetTurnstile = () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.reset(widgetIdRef.current);
+        setTurnstileToken("");
+      }
+    };
+
     try {
       const res = await fetch("/api/report", {
         method: "POST",
@@ -222,13 +230,11 @@ export default function ReportForm({ ackEmailAvailable = false, t, locale }: {
 
       setErrorMessage(friendlyError(data?.error, t));
       setStatus("error");
-      if (data?.error === "captcha" && widgetIdRef.current && window.turnstile) {
-        window.turnstile.reset(widgetIdRef.current);
-        setTurnstileToken("");
-      }
+      resetTurnstile();
     } catch {
       setErrorMessage(friendlyError(undefined, t));
       setStatus("error");
+      resetTurnstile();
     }
   }
 
