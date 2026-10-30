@@ -48,11 +48,11 @@ const HEADING = {
   4: "mt-5 text-sm font-semibold uppercase tracking-wide text-fg-muted",
 } as const;
 
-function BlockView({ b, locale, headingOffset }: { b: Block; locale: Locale; headingOffset: number }) {
+function BlockView({ b, locale, headingOffset, idPrefix }: { b: Block; locale: Locale; headingOffset: number; idPrefix: string }) {
   switch (b.t) {
     case "h": {
       const Tag = (`h${Math.min(Math.max(b.level + headingOffset, 2), 6)}`) as "h2" | "h3" | "h4" | "h5" | "h6";
-      return <Tag id={b.id} className={`scroll-mt-24 ${HEADING[b.level]}`}><Inlines nodes={b.c} locale={locale} /></Tag>;
+      return <Tag id={idPrefix + b.id} className={`scroll-mt-24 ${HEADING[b.level]}`}><Inlines nodes={b.c} locale={locale} /></Tag>;
     }
     case "p":
       return <p className="mt-4 leading-relaxed text-fg-muted"><Inlines nodes={b.c} locale={locale} /></p>;
@@ -88,13 +88,13 @@ function BlockView({ b, locale, headingOffset }: { b: Block; locale: Locale; hea
  * <h(n + headingOffset)>, clamped to h2..h6 (never an <h1>). The default offset 1
  * suits content under a page-level <h2>; pass 0 when the page's <h1> sits directly above.
  */
-export default function Markdown({ source, className = "", locale = "en", headingOffset = 1 }: {
-  source: string; className?: string; locale?: Locale; headingOffset?: number;
+export default function Markdown({ source, className = "", locale = "en", headingOffset = 1, idPrefix = "" }: {
+  source: string; className?: string; locale?: Locale; headingOffset?: number; idPrefix?: string;
 }) {
   const blocks = parseMarkdown(source);
   return (
     <div className={className}>
-      {blocks.map((b, i) => <BlockView key={i} b={b} locale={locale} headingOffset={headingOffset} />)}
+      {blocks.map((b, i) => <BlockView key={i} b={b} locale={locale} headingOffset={headingOffset} idPrefix={idPrefix} />)}
     </div>
   );
 }
