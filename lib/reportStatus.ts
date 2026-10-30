@@ -3,7 +3,7 @@
 // the server keeps only the token's SHA-256, so the link cannot be rebuilt
 // from the database.
 import { createHash, randomBytes } from 'node:crypto'
-import { REPORT_STATUSES, type ReportStatus } from './db'
+import { REPORT_STATUSES, type ReportRecord, type ReportStatus } from './db'
 import { SITE_URL } from './links'
 import { DEFAULT_LOCALE, isLocale, localePath } from './i18n'
 
@@ -13,6 +13,23 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/ // 32 random bytes, base64url, no padding
 export const newStatusToken = () => randomBytes(32).toString('base64url')
 export const hashStatusToken = (token: string) => createHash('sha256').update(token).digest('hex')
 export const isStatusToken = (v: string) => TOKEN_RE.test(v)
+
+export type StatusLookup = { state: 'found'; report: ReportRecord } | { state: 'missing' } | { state: 'error' }
+
+/** Look a report up by its raw token. A bad token or no row is 'missing'; a
+ *  failing lookup is 'error', so an outage is not shown as "not found". */
+export async function lookupReportStatus(
+  token: string,
+  deps: { find: (hash: string) => Promise<ReportRecord | null> },
+): Promise<StatusLookup> {
+  if (!isStatusToken(token)) return { state: 'missing' }
+  try {
+    const report = await deps.find(hashStatusToken(token))
+    return report ? { state: 'found', report } : { state: 'missing' }
+  } catch {
+    return { state: 'error' }
+  }
+}
 
 /**
  * Absolute base for links we hand out (API responses, e-mails). Production

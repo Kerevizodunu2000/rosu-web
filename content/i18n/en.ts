@@ -276,6 +276,9 @@ export const en = {
     notFoundText:
       'This tracking link is not valid, or the report it pointed to has been deleted. Reports are kept for twelve months and removed on request.',
     sendNew: 'Send a new report',
+    unavailable: 'Status unavailable right now',
+    unavailableText:
+      "We couldn't look up this report just now. Please try again in a few minutes — your link still works.",
     reportN: 'Report #{id}',
     sentOn: 'Sent on {date}',
     updatedOn: ' · last updated {date}',
