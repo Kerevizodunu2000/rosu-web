@@ -10,7 +10,7 @@ export type ReportRecord = {
   id: number; created_at: string; source: 'app' | 'web'
   title: string; description: string; contact: string | null
   app_version: string | null; os: string | null; lang: string | null; ip_hash: string | null
-  image_status: 'none' | 'stored' | 'archived' | 'error'
+  image_status: 'none' | 'uploading' | 'stored' | 'archived' | 'error'
   image_drive_id: string | null; image_name: string | null; image_mime: string | null; image_original_name: string | null
   archive_ref: string | null; archived_at: string | null
   status: ReportStatus; status_note: string | null; fixed_in: string | null; status_updated_at: string | null
@@ -39,11 +39,12 @@ export async function getDb(): Promise<Sql> {
 export async function insertReport(sql: Sql, r: {
   source: string; title: string; description: string; contact: string
   app_version: string; os: string; lang: string; ip_hash: string; status_token_hash?: string
+  image_status?: 'none' | 'uploading'
 }): Promise<{ id: number }> {
   const rows = await sql`
-    INSERT INTO reports (source, title, description, contact, app_version, os, lang, ip_hash, status_token_hash)
+    INSERT INTO reports (source, title, description, contact, app_version, os, lang, ip_hash, status_token_hash, image_status)
     VALUES (${r.source}, ${r.title}, ${r.description}, ${r.contact}, ${r.app_version}, ${r.os}, ${r.lang}, ${r.ip_hash},
-            ${r.status_token_hash ?? null})
+            ${r.status_token_hash ?? null}, ${r.image_status ?? 'none'})
     RETURNING id` as { id: number }[]
   return { id: Number(rows[0].id) }
 }
@@ -53,7 +54,7 @@ export async function setReportImage(sql: Sql, id: number, v: {
 }): Promise<void> {
   await sql`UPDATE reports SET image_status = ${v.image_status},
     image_drive_id = ${v.image_drive_id ?? null}, image_name = ${v.image_name ?? null},
-    image_mime = ${v.image_mime ?? null}, image_original_name = ${v.image_original_name ?? null} WHERE id = ${id}`
+    image_mime = ${v.image_mime ?? null}, image_original_name = ${v.image_original_name ?? null} WHERE id = ${id} AND archived_at IS NULL`
 }
 
 const iso = (v: unknown): string | null =>
@@ -174,7 +175,7 @@ export async function countUnarchived(sql: Sql): Promise<number> {
 export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<number[]> {
   if (!ids.length) return []
   const rows = await sql`UPDATE reports SET archived_at = now(), archive_ref = ${archiveRef},
-    image_status = CASE WHEN image_status = 'stored' THEN 'archived' ELSE image_status END
+    image_status = CASE WHEN image_status = 'stored' THEN 'archived' WHEN image_status = 'uploading' THEN 'error' ELSE image_status END
     WHERE id = ANY(${ids}) AND archived_at IS NULL RETURNING id` as { id: number }[]
   return rows.map((r) => Number(r.id))
 }
