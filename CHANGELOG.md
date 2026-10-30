@@ -27,9 +27,8 @@ Work toward **2.0 "Brand & Show"**.
 - A 404 page in all three languages.
 
 ### Changed
-- **Faster landing page on mobile.** Only the main font (with Turkish letters) is preloaded,
-  Japanese text uses the system font, and screenshots are served as AVIF at the size they
-  are shown.
+- **Faster landing page on mobile.** The main font preloads its Turkish letters, Japanese text
+  uses the system font, and screenshots are served as AVIF at the size they are shown.
 - The home page loads the screenshot viewer only when you open it, and the site targets current
   browsers (Chrome and Edge 111, Firefox 111, Safari 16.4) instead of shipping legacy code.
 - The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song

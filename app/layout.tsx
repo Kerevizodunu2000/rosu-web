@@ -8,10 +8,10 @@ const geistSans = Geist({
   subsets: ["latin", "latin-ext"],
 });
 
+// Stays preloaded: the hero tagline is mono, and a late swap re-wraps it on /tr (layout shift).
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-  preload: false,
 });
 
 const SITE_DESCRIPTION =
