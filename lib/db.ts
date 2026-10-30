@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { neon } from '@neondatabase/serverless'
 import { ensureSchema } from './schema'
+import type { RateLimits, RateReason } from './ratelimit'
 
 export type ReportStatus = 'received' | 'in_review' | 'fixed' | 'closed'
 export const REPORT_STATUSES: readonly ReportStatus[] = ['received', 'in_review', 'fixed', 'closed']
@@ -9,7 +10,7 @@ export type ReportRecord = {
   id: number; created_at: string; source: 'app' | 'web'
   title: string; description: string; contact: string | null
   app_version: string | null; os: string | null; lang: string | null; ip_hash: string | null
-  image_status: 'none' | 'stored' | 'archived' | 'error'
+  image_status: 'none' | 'uploading' | 'stored' | 'archived' | 'error'
   image_drive_id: string | null; image_name: string | null; image_mime: string | null; image_original_name: string | null
   archive_ref: string | null; archived_at: string | null
   status: ReportStatus; status_note: string | null; fixed_in: string | null; status_updated_at: string | null
@@ -38,11 +39,12 @@ export async function getDb(): Promise<Sql> {
 export async function insertReport(sql: Sql, r: {
   source: string; title: string; description: string; contact: string
   app_version: string; os: string; lang: string; ip_hash: string; status_token_hash?: string
+  image_status?: 'none' | 'uploading'
 }): Promise<{ id: number }> {
   const rows = await sql`
-    INSERT INTO reports (source, title, description, contact, app_version, os, lang, ip_hash, status_token_hash)
+    INSERT INTO reports (source, title, description, contact, app_version, os, lang, ip_hash, status_token_hash, image_status)
     VALUES (${r.source}, ${r.title}, ${r.description}, ${r.contact}, ${r.app_version}, ${r.os}, ${r.lang}, ${r.ip_hash},
-            ${r.status_token_hash ?? null})
+            ${r.status_token_hash ?? null}, ${r.image_status ?? 'none'})
     RETURNING id` as { id: number }[]
   return { id: Number(rows[0].id) }
 }
@@ -52,7 +54,7 @@ export async function setReportImage(sql: Sql, id: number, v: {
 }): Promise<void> {
   await sql`UPDATE reports SET image_status = ${v.image_status},
     image_drive_id = ${v.image_drive_id ?? null}, image_name = ${v.image_name ?? null},
-    image_mime = ${v.image_mime ?? null}, image_original_name = ${v.image_original_name ?? null} WHERE id = ${id}`
+    image_mime = ${v.image_mime ?? null}, image_original_name = ${v.image_original_name ?? null} WHERE id = ${id} AND archived_at IS NULL`
 }
 
 const iso = (v: unknown): string | null =>
@@ -173,7 +175,7 @@ export async function countUnarchived(sql: Sql): Promise<number> {
 export async function markArchived(sql: Sql, ids: number[], archiveRef: string): Promise<number[]> {
   if (!ids.length) return []
   const rows = await sql`UPDATE reports SET archived_at = now(), archive_ref = ${archiveRef},
-    image_status = CASE WHEN image_status = 'stored' THEN 'archived' ELSE image_status END
+    image_status = CASE WHEN image_status = 'stored' THEN 'archived' WHEN image_status = 'uploading' THEN 'error' ELSE image_status END
     WHERE id = ANY(${ids}) AND archived_at IS NULL RETURNING id` as { id: number }[]
   return rows.map((r) => Number(r.id))
 }
@@ -238,13 +240,35 @@ export type RateKind = 'report' | 'login' | 'login_fail' | 'crash' | 'ack' | 'ac
 export async function recordRateEvent(sql: Sql, ip_hash: string, kind: RateKind = 'report'): Promise<void> {
   await sql`INSERT INTO rate_events (ip_hash, kind) VALUES (${ip_hash}, ${kind})`
 }
-export async function countEventsSince(sql: Sql, ip_hash: string, sinceIso: string, kind: RateKind = 'report'): Promise<number> {
-  const rows = await sql`SELECT count(*)::int AS n FROM rate_events WHERE kind = ${kind} AND ip_hash = ${ip_hash} AND created_at > ${sinceIso}` as { n: number }[]
-  return rows[0].n
-}
-export async function countAllEventsSince(sql: Sql, sinceIso: string, kind: RateKind = 'report'): Promise<number> {
-  const rows = await sql`SELECT count(*)::int AS n FROM rate_events WHERE kind = ${kind} AND created_at > ${sinceIso}` as { n: number }[]
-  return rows[0].n
+/**
+ * Count and record a rate event in one transaction, serialized by an advisory
+ * lock: per kind when there is a global cap (so the global count is exact too),
+ * else per kind and IP. Returns the limit that blocked it, or null once recorded.
+ */
+export async function tryRecordRateEvent(sql: Sql, ip_hash: string, kind: RateKind, limits: RateLimits, nowMs: number):
+  Promise<null | RateReason> {
+  const global = Number.isFinite(limits.globalDay) ? limits.globalDay : null
+  const lockKey = global === null ? `${kind}:${ip_hash}` : kind
+  const minAgo = new Date(nowMs - 60_000).toISOString()
+  const dayAgo = new Date(nowMs - 86_400_000).toISOString()
+  const [, rows] = await sql.transaction((txn) => [
+    txn`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
+    txn`WITH c AS (
+        SELECT count(*) FILTER (WHERE ip_hash = ${ip_hash} AND created_at > ${minAgo}) AS m,
+               count(*) FILTER (WHERE ip_hash = ${ip_hash}) AS d,
+               count(*) AS g
+          FROM rate_events
+         WHERE kind = ${kind} AND created_at > ${dayAgo} AND (${global}::int IS NOT NULL OR ip_hash = ${ip_hash})
+      ), r AS (
+        SELECT CASE WHEN m >= ${limits.perIpMinute} THEN 'rate_minute'
+                    WHEN d >= ${limits.perIpDay} THEN 'rate_day'
+                    WHEN ${global}::int IS NOT NULL AND g >= ${global}::int THEN 'rate_global' END AS reason FROM c
+      ), ins AS (
+        INSERT INTO rate_events (ip_hash, kind) SELECT ${ip_hash}, ${kind} FROM r WHERE reason IS NULL RETURNING 1
+      )
+      SELECT reason FROM r`,
+  ]) as [unknown, { reason: RateReason | null }[]]
+  return rows[0]?.reason ?? null
 }
 export async function pruneRateEvents(sql: Sql, beforeIso: string): Promise<void> {
   await sql`DELETE FROM rate_events WHERE created_at < ${beforeIso}`

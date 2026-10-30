@@ -20,27 +20,44 @@ export class ArchiveRewriteError extends Error {
 }
 
 const REWRITE_TRIES = 3
+const DOWNLOAD_TRIES = 3
+/** An upload this young may still be running: leave the report for the next run. */
+const UPLOAD_GRACE_MS = 60 * 60 * 1000
 
-export async function runArchive(deps: ArchiveDeps, today: string): Promise<{ archived: number; archiveName?: string }> {
-  const reports = await deps.listUnarchived()
-  if (!reports.length) return { archived: 0 }
+/** A network failure or a Drive 429/5xx: worth another try, never a reason to drop the image. */
+const isTransient = (e: unknown) =>
+  e instanceof TypeError || /-> (?:429|5\d\d)\b/.test(e instanceof Error ? e.message : String(e))
+
+export async function runArchive(deps: ArchiveDeps, today: string, nowMs = Date.now()): Promise<{ archived: number; archiveName?: string }> {
+  const listed = await deps.listUnarchived()
+  const reports: ReportRecord[] = []
   const entries: { report: { id: number }; image?: { name: string; bytes: Uint8Array }; imageId?: string }[] = []
-  for (const r of reports) {
+  for (const r of listed) {
+    if (r.image_status === 'uploading' && nowMs - new Date(r.created_at).getTime() < UPLOAD_GRACE_MS) continue
     let image: { name: string; bytes: Uint8Array } | undefined
     let imageId: string | undefined
     if (r.image_status === 'stored' && r.image_drive_id && r.image_name) {
-      try {
-        image = { name: r.image_name, bytes: await deps.downloadImage(r.image_drive_id) }
-        imageId = r.image_drive_id
-      } catch {
-        // A single unreadable image (deleted in Drive, or a transient error) must
-        // not wedge the whole nightly archive forever — archive the report's text
-        // without it and move on.
-        image = undefined
+      let transient = false
+      for (let i = 0; i < DOWNLOAD_TRIES; i++) {
+        try {
+          image = { name: r.image_name, bytes: await deps.downloadImage(r.image_drive_id) }
+          imageId = r.image_drive_id
+          transient = false
+          break
+        } catch (e) {
+          // A permanent error (deleted in Drive, 403, ...) must not wedge the
+          // nightly archive forever: archive the report's text without it.
+          transient = isTransient(e)
+          if (!transient) break
+        }
       }
+      // Drive still failing: keep the report and its image for the next run.
+      if (transient) continue
     }
+    reports.push(r)
     entries.push({ report: r as unknown as { id: number }, image, imageId })
   }
+  if (!reports.length) return { archived: 0 }
   const archiveName = `rosu-reports-${today}.zip`
   const fileId = await deps.uploadArchive(archiveName, await buildReportsZip(entries))
   let marked: number[]

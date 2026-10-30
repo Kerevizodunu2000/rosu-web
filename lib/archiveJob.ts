@@ -37,7 +37,6 @@ const rootName = () => process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'Rosu Reports'
  */
 export async function runArchiveJob(): Promise<{ archived: number; archiveName?: string }> {
   const sql = await getDb()
-  const drive = driveFromEnv()
   const d = new Date()
   const today = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 
@@ -49,7 +48,10 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
     await pruneRateEvents(sql, new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
   }
   let result: { archived: number; archiveName?: string }
+  let failed = false
   try {
+    // Built inside the try, so missing Drive settings still prune below.
+    const drive = driveFromEnv()
     result = await withLock(lockStore(sql), DRIVE_ARCHIVES_LOCK, () => runArchive({
     listUnarchived: () => listUnarchived(sql),
     downloadImage: (id) => drive.downloadFile(id),
@@ -63,13 +65,15 @@ export async function runArchiveJob(): Promise<{ archived: number; archiveName?:
     deleteImage: (id) => drive.deleteFile(id),
   }, today), JOB_WAIT)
   } catch (e) {
+    failed = true
     if (e instanceof ArchiveRewriteError) {
       // Leave a trail the admin sees: this file needs a manual look in Drive.
       try { await insertAudit(sql, 'maintenance', null, `archive: ${e.message} — remove it by hand`) } catch { /* reported by the cron */ }
     }
     throw e
   } finally {
-    await pruneRate()
+    // The archive's own error matters more than a prune error.
+    try { await pruneRate() } catch (e) { if (!failed) throw e }
   }
   return result
 }
