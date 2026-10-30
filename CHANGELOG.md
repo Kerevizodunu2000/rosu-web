@@ -27,6 +27,8 @@ Work toward **2.0 "Brand & Show"**.
 - A 404 page in all three languages.
 
 ### Changed
+- The home page loads the screenshot viewer only when you open it, and the site targets current
+  browsers (Chrome and Edge 111, Firefox 111, Safari 16.4) instead of shipping legacy code.
 - The guide covers v1.9–v1.10 (watch folder, saved searches, gallery, Move Library, same-song
   detection). The home page no longer says Rosu "doesn't phone home": crash reports are opt-in
   and the update check only asks for the latest version number.
