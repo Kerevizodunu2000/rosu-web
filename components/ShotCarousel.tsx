@@ -137,7 +137,7 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
       </div>
 
       {count > VISIBLE && (
-        <div className="mt-6 flex items-center justify-center gap-2">
+        <div className="relative mt-6 flex items-center justify-center">
           <div className="flex items-center" role="group" aria-label={labels.pages}>
             {shots.map((s, i) => (
               <button
@@ -162,7 +162,7 @@ export default function ShotCarousel({ shots, labels = DEFAULT_LABELS }: { shots
               type="button"
               onClick={() => setUserPaused((p) => !p)}
               aria-label={userPaused ? labels.play : labels.pause}
-              className="flex h-6 min-w-6 items-center justify-center rounded-full text-fg-muted transition-colors hover:text-fg"
+              className="absolute right-0 flex h-6 min-w-6 items-center justify-center rounded-full text-fg-muted transition-colors hover:text-fg"
             >
               <IconPlayPause playing={!userPaused} />
             </button>
