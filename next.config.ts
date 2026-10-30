@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
-// Baseline security headers (defense-in-depth). Intentionally no strict
-// script-src CSP: the report form loads Cloudflare Turnstile and Next injects
-// inline runtime scripts, so a locked-down policy would break them. The safe,
-// high-value subset below still blocks clickjacking (frame-ancestors + XFO),
-// MIME sniffing, referrer leakage, and unrequested browser features.
+// Baseline security headers (defense-in-depth). The report and admin pages get
+// a strict per-request nonce CSP from proxy.ts / lib/csp.ts, which replaces the
+// static `frame-ancestors` CSP below there. The static pages cannot carry a
+// nonce, so they keep only `frame-ancestors`; with XFO it blocks clickjacking,
+// and the rest blocks MIME sniffing, referrer leakage, and unrequested
+// browser features.
 // HSTS has no `preload`: the site lives on the shared vercel.app domain. No
 // COEP: it would block the cross-origin Turnstile iframe on the report form.
 const securityHeaders = [

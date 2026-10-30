@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleCrash, CRASH_LIMITS_INPUT } from '@/lib/crash'
 import { checkRateLimit, CRASH_LIMITS } from '@/lib/ratelimit'
-import { getDb, recordCrash, recordRateEvent, countEventsSince, countAllEventsSince } from '@/lib/db'
+import { getDb, recordCrash, tryRecordRateEvent } from '@/lib/db'
 import { hashIp } from '@/lib/crypto'
 import { rateIp } from '@/lib/net'
 import { requireEnv } from '@/lib/env'
@@ -27,9 +27,7 @@ export async function POST(req: NextRequest) {
       deps: {
         appToken: process.env.REPORT_APP_TOKEN || '',
         checkRateLimit: () => checkRateLimit(ipHash, {
-          countEventsSince: (h, since) => countEventsSince(sql, h, since, 'crash'),
-          countAllEventsSince: (since) => countAllEventsSince(sql, since, 'crash'),
-          recordRateEvent: (h) => recordRateEvent(sql, h, 'crash'),
+          tryRecordRateEvent: (h, limits, nowMs) => tryRecordRateEvent(sql, h, 'crash', limits, nowMs),
         }, Date.now(), CRASH_LIMITS),
         record: (c) => recordCrash(sql, {
           fingerprint: c.fingerprint, excType: c.excType, message: c.message, frames: c.frames.join('\n'),

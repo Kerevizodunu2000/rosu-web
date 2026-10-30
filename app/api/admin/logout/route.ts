@@ -22,8 +22,10 @@ export async function POST(req: NextRequest) {
     return res
   }
   const body = await req.json().catch(() => ({})) as { all?: unknown }
-  const ipHash = hashIp('login:' + rateIp(req), process.env.IP_HASH_SALT || '')
   try {
+    // Signing out always revokes; without a salt the audit row gets no IP hash (never an empty-salt one).
+    const salt = process.env.IP_HASH_SALT
+    const ipHash = salt ? hashIp('login:' + rateIp(req), salt) : null
     if (body?.all === true) {
       const n = await revokeAllAdminSessions(admin.sql)
       await insertAudit(admin.sql, 'logout_all', ipHash, `revoked=${n}`)

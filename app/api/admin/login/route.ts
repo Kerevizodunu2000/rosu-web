@@ -8,7 +8,7 @@ import { checkRateLimit, LOGIN_LIMITS } from '@/lib/ratelimit'
 import { sameOrigin, sessionStore } from '@/lib/adminGuard'
 import { GATE_HEADER, gateOk } from '@/lib/adminPath'
 import {
-  getDb, countEventsSince, countAllEventsSince, recordRateEvent, loginFailuresSince,
+  getDb, tryRecordRateEvent, recordRateEvent, loginFailuresSince,
   claimTotpStep, insertAudit, countAuditSince,
 } from '@/lib/db'
 import { requireEnv } from '@/lib/env'
@@ -29,9 +29,7 @@ export async function POST(req: NextRequest) {
       adminPassword: process.env.ADMIN_PASSWORD || '',
       totpSecret: process.env.ADMIN_TOTP_SECRET || '',
       checkRateLimit: () => checkRateLimit(ipHash, {
-        countEventsSince: (h, s) => countEventsSince(sql, h, s, 'login'),
-        countAllEventsSince: (s) => countAllEventsSince(sql, s, 'login'),
-        recordRateEvent: (h) => recordRateEvent(sql, h, 'login'),
+        tryRecordRateEvent: (h, limits, nowMs) => tryRecordRateEvent(sql, h, 'login', limits, nowMs),
       }, Date.now(), LOGIN_LIMITS),
       failuresSince: (since) => loginFailuresSince(sql, ipHash, since),
       recordFailure: () => recordRateEvent(sql, ipHash, 'login_fail'),
